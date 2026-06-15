@@ -1,0 +1,640 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Repository overview &#8212; nvsubquadratic 0.1.0</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=a95f357e85573c9b56d5" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=a95f357e85573c9b56d5" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=631c4e8f" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=a95f357e85573c9b56d5"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=a95f357e85573c9b56d5" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=a95f357e85573c9b56d5" />
+
+
+
+    <script src="_static/documentation_options.js?v=01f34227"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=fd10adb8"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'repository_overview';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+
+    <link rel="icon" href="_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples/index.html" />
+    <link rel="prev" title="Architecture" href="architecture.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.1.0" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+
+
+  </head>
+
+  <body data-default-mode="">
+
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nvsubquadratic 0.1.0 - Home"/>
+    <img src="_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nvsubquadratic 0.1.0 - Home"/>
+  
+  
+    <p class="title logo__title">nvsubquadratic 0.1.0</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nvsubquadratic 0.1.0 - Home"/>
+    <img src="_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nvsubquadratic 0.1.0 - Home"/>
+  
+  
+    <p class="title logo__title">nvsubquadratic 0.1.0</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Overview</a></li>
+</ul>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Repository Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reports.html">Reports</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="ops/README.html">Ops Overview</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="ops/mixed_boundary_conditions.html">Mixed Boundary-Condition FFT Convolution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api_reference/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/ops.html">Ops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/modules.html">Modules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/networks.html">Networks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/parallel.html">Parallel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/core.html">Core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference/experiments.html">Experiments</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Repository overview</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="repository-overview">
+<h1>Repository overview<a class="headerlink" href="#repository-overview" title="Link to this heading">#</a></h1>
+<p>A map of what lives where at the repo root.  The library code
+(<code class="docutils literal notranslate"><span class="pre">nvsubquadratic/</span></code>) and the training driver (<code class="docutils literal notranslate"><span class="pre">experiments/</span></code>) sit
+alongside the per-task configs (<code class="docutils literal notranslate"><span class="pre">examples/</span></code>), the perf measurement
+tree (<code class="docutils literal notranslate"><span class="pre">benchmarks/</span></code>), and the supporting infrastructure (<code class="docutils literal notranslate"><span class="pre">scripts/</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tests/</span></code>, <code class="docutils literal notranslate"><span class="pre">reports/</span></code>, <code class="docutils literal notranslate"><span class="pre">docs/</span></code>).</p>
+<section id="layout">
+<h2>Layout<a class="headerlink" href="#layout" title="Link to this heading">#</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>nvSubquadratic/
+├── nvsubquadratic/          library code — see &quot;library tree&quot; below
+├── experiments/             training framework (PyTorch Lightning)
+│   ├── run.py                 CLI entry point
+│   ├── trainer.py             construct_trainer (checkpoints, precision, W&amp;B)
+│   ├── default_cfg.py         typed ExperimentConfig dataclasses
+│   ├── lightning_wrappers/    task-specific wrappers (classification, diffusion, regression, …)
+│   ├── datamodules/           LightningDataModule subclasses (ImageNet, MNIST, WELL, …)
+│   ├── callbacks/             FiLM monitor, image-grid viz, EMA, walltime checkpointer, …
+│   └── utils/                 cli + checkpointing helpers
+├── examples/                LazyConfig recipes that feed experiments.run
+│   ├── imagenet_classification/
+│   ├── vit5_imagenet/         ViT-5 baseline suite (v1–v5)
+│   ├── spatial_recall_{1,2,3}d/ and spatial_recall_v2/
+│   ├── well/                  The Well PDE benchmark suite
+│   └── overview_tracker.md    active experimental roadmap
+├── benchmarks/              performance measurement (the canonical home)
+│   ├── README.md              ViT-5-Small headline throughput tables
+│   ├── compare_flops.py       FLOP comparison across ViT-5 variants
+│   ├── benchmark_imagenet_diffusion_gpu.py
+│   ├── benchmark_patch_size_2d.py
+│   ├── ops/                   op-level benchmarks (fftconv2d / MLP / subq-ops)
+│   ├── vit5_imagenet/         ViT-5 throughput, profile, verify, validate
+│   └── well/                  WELL dataloader / training-step / VRMSE
+├── reports/                 frozen-in-time investigations with regen scripts
+│   ├── ckconv_block_diagonal_kernel/
+│   ├── siren_omega0_dimensional_scaling/
+│   ├── spatial_recall/
+│   └── vit5_imagenet_dataloader_profiling/
+├── scripts/                 utilities (data prep, sanity, SLURM, viz)
+│   ├── slurm/                 SLURM submit scripts (portable wrapper + per-experiment)
+│   ├── data/                  data prep (ImageNet folder extraction, normalization stats, …)
+│   ├── visualization/         kernel viewers + throughput plot
+│   └── check_gpu_availability.py, license_check.py, …
+├── tests/                   correctness tests
+│   ├── conftest.py            shared fixtures
+│   ├── ops/, modules/, networks/, parallel/   per-package test trees
+│   └── test_*.py              top-level integration tests
+├── docs/                    Sphinx documentation site (this site)
+│   ├── conf.py, index.rst     site config + landing
+│   ├── getting_started.md, architecture.md, repository_overview.md
+│   ├── api_reference/         curated API per area
+│   ├── ops/                   FFT-ops math primer + FP16 derivation
+│   ├── examples/index.md, benchmarks.md, reports.md
+│   └── _templates/, _static/  autosummary templates + custom CSS
+├── docs-tracker.md          documentation coverage status per file
+├── CONVENTIONS.md           Google-style docstring guide and PR checklist
+├── README.md                top-level install / overview
+├── pyproject.toml           project metadata, dependencies, ruff config
+├── Dockerfile               production container
+├── nvsubquadratic.def       Apptainer/Singularity recipe
+└── setup_conda_env.sh       local conda bootstrap
+</pre></div>
+</div>
+</section>
+<section id="library-tree-nvsubquadratic">
+<h2>Library tree (<code class="docutils literal notranslate"><span class="pre">nvsubquadratic/</span></code>)<a class="headerlink" href="#library-tree-nvsubquadratic" title="Link to this heading">#</a></h2>
+<p>The library itself is organised bottom-up: function-only convolution
+primitives in <code class="docutils literal notranslate"><span class="pre">ops/</span></code>, then <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code>-shaped mixers and blocks in
+<code class="docutils literal notranslate"><span class="pre">modules/</span></code>, then full architectures in <code class="docutils literal notranslate"><span class="pre">networks/</span></code>.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>nvsubquadratic/
+├── lazy_config.py                deferred-instantiation system (LazyConfig, instantiate)
+├── ops/                          function-only convolution primitives
+│   ├── fftconv.py                fp32 reference FFT conv (1D / 2D / 3D, linear)
+│   ├── fftconv_fp16.py           half-precision linear-conv variants
+│   ├── circular_fftconv.py       fp32 periodic-boundary FFT conv
+│   ├── circular_fftconv_fp16.py  half-precision periodic variants
+│   ├── fftconv_multihead.py      multi-head + low-rank factorisations
+│   ├── fftconv_chunked.py        peak-FFT-memory chunking helpers
+│   ├── fftconv_custom.py         subquadratic_ops_torch CUDA wrappers
+│   ├── causal_conv1d_custom.py   direct (non-FFT) CUDA causal conv1d wrappers
+│   └── mixed_fftconv.py          per-axis mixed boundary-condition FFT conv
+├── modules/                      nn.Module building blocks
+│   ├── hyena_nd.py               Hyena ND mixer (two-gate sandwich, CP)
+│   ├── mamba_nd.py               Mamba SSM (ND, selective, raster scan)
+│   ├── attention.py              multi-head attention (RoPE, ND)
+│   ├── vit5_attention.py         ViT-5 register-aware attention
+│   ├── vit5_hyena_adapter.py     Hyena drop-in for ViT-5
+│   ├── sequence_mixer.py         operator-agnostic QKV dispatch
+│   ├── condition_mixer.py        cross-attention conditioning mixer
+│   ├── kernels_nd.py             SIREN / RFF kernels (multi-ω₀, block-diag)
+│   ├── ckconv_nd.py              CKConv ND (implicit k_θ(p))
+│   ├── ckconv_multihead_nd.py    multi-head CKConv (low-rank)
+│   ├── distributed_depthwise_conv_nd.py   CP-aware depthwise convs
+│   ├── causal_conv1d.py          left-only-padded Conv1d wrapper
+│   ├── subq_ops_causal_conv1d.py nn.Conv1d-compatible CUDA depthwise
+│   ├── residual_block.py         pre-norm + mixer + MLP (+ AdaLN-Zero)
+│   ├── vit5_residual_block.py    ViT-5 residual block (LayerScale, registers)
+│   ├── patchify.py               strided patch embedding / unpatchify
+│   ├── position_encoding.py      axis-factorised learned PE
+│   ├── masks_nd.py               exponential / Gaussian / block-aligned masks
+│   ├── mlp.py                    GELU / SwiGLU / GLU MLP
+│   ├── film.py                   FiLM kernel generator + register pooling
+│   ├── grn.py                    GlobalResponseNorm (ConvNeXt V2)
+│   ├── layer_scale.py            LayerScale γ·F(x)
+│   ├── drop_path.py              stochastic depth
+│   ├── rms_norm.py               RMSNorm + PerHeadRMSNorm
+│   ├── rms_norm_channel_first.py channel-first RMSNorm
+│   └── schedulers.py             ResumableSequentialLR
+├── networks/                     end-to-end architectures
+│   ├── general_purpose_resnet.py ResidualNetwork (LazyConfig stack)
+│   ├── classification_resnet.py  GAP-readout classification head
+│   ├── vit5_classification.py    ViT-5 hybrid Hyena/attention backbone
+│   ├── jit.py                    JiT diffusion backbone
+│   ├── jit_utils.py              JiT helpers (RoPE, RMSNorm, sin-cos PE)
+│   ├── huggingface_diffusers.py  HF DiT / UVit adapters
+│   └── baselines/
+│       ├── unet_convnext.py      Well UNet-ConvNeXt baseline
+│       └── unet_convnext_v2.py   …with fixed finest-skip
+├── parallel/                     context-parallel primitives
+│   ├── a2a_comms.py              AllToAllSingle (autograd-aware)
+│   └── utils.py                  init_parallel_state + zigzag split/gather
+├── utils/                        cross-area utilities
+│   ├── init.py                   weight-init factories
+│   ├── qk_norm.py                QK normalization (apply + L2Norm)
+│   ├── rope.py                   rotary position embedding (1D / 2D / 3D)
+│   └── quack_utils.py            QuACK capability probe
+└── testing/
+    └── utils.py                  compute_relative_error
+</pre></div>
+</div>
+</section>
+<section id="what-each-top-level-directory-does">
+<h2>What each top-level directory does<a class="headerlink" href="#what-each-top-level-directory-does" title="Link to this heading">#</a></h2>
+<p><strong><code class="docutils literal notranslate"><span class="pre">nvsubquadratic/</span></code></strong> — The library.  Function-only ops, <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code>
+building blocks, full networks, context-parallel primitives, and a
+deferred-instantiation system (<code class="docutils literal notranslate"><span class="pre">LazyConfig</span></code>) that every example
+config relies on.  See <a class="reference internal" href="api_reference/index.html"><span class="doc">API Reference</span></a> for the curated API.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">experiments/</span></code></strong> — The training driver.  Lightning wrappers,
+datamodules, callbacks, the <code class="docutils literal notranslate"><span class="pre">construct_trainer</span></code> helper, and the
+<code class="docutils literal notranslate"><span class="pre">run.py</span></code> CLI entry point.  Consumes a network + datamodule + wrapper
+via a <code class="docutils literal notranslate"><span class="pre">LazyConfig</span></code> tree from <code class="docutils literal notranslate"><span class="pre">examples/</span></code> and runs it through Lightning.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">examples/</span></code></strong> — Per-task training recipes.  Each subdirectory is a
+config tree (LazyConfig dataclasses) that fully describes one
+experiment.  Running it is
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">experiments.run</span> <span class="pre">--config</span> <span class="pre">examples/.../&lt;config&gt;.py</span></code>.  The
+live roadmap is at
+<a class="reference external" href="https://github.com/NVIDIA-BioNeMo/nvSubquadratic/blob/main/examples/overview_tracker.md"><code class="docutils literal notranslate"><span class="pre">examples/overview_tracker.md</span></code></a>.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">benchmarks/</span></code></strong> — The single home for performance measurement.
+Op-level microbenchmarks (<code class="docutils literal notranslate"><span class="pre">benchmarks/ops/</span></code>), end-to-end model
+throughput (<code class="docutils literal notranslate"><span class="pre">vit5_imagenet/</span></code>, <code class="docutils literal notranslate"><span class="pre">well/</span></code>), and FLOP / scaling
+comparisons.  Headline numbers are pulled into the <a class="reference internal" href="benchmarks.html"><span class="doc">Benchmarks</span></a>
+docs page.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">reports/</span></code></strong> — Frozen-in-time technical investigations.  One
+<code class="docutils literal notranslate"><span class="pre">REPORT.md</span></code> per topic alongside the scripts and figures it cites.
+Indexed at <a class="reference internal" href="reports.html"><span class="doc">Reports</span></a>.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">scripts/</span></code></strong> — Utility / glue scripts.  SLURM submit drivers
+(<code class="docutils literal notranslate"><span class="pre">scripts/slurm/</span></code>), data prep (<code class="docutils literal notranslate"><span class="pre">scripts/data/</span></code>), kernel viewers (<code class="docutils literal notranslate"><span class="pre">scripts/visualization/</span></code>),
+and standalone sanity scripts.  No benchmarks live here — those moved
+to <code class="docutils literal notranslate"><span class="pre">benchmarks/</span></code>.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">tests/</span></code></strong> — Correctness tests, mirroring the library’s per-package
+structure: <code class="docutils literal notranslate"><span class="pre">tests/ops/</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/modules/</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/networks/</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tests/parallel/</span></code>.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">docs/</span></code></strong> — This Sphinx documentation site.  Narrative pages
+(Getting Started, Architecture, this Repository Overview, Examples,
+Benchmarks, Reports, Ops Overview) plus the curated
+<a class="reference internal" href="api_reference/index.html"><span class="doc">API Reference</span></a>.</p>
+</section>
+<section id="where-to-go-next">
+<h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="architecture.html"><span class="doc">Architecture</span></a> — the three-layer
+nvSubquadratic / subquadratic-ops / megatron-core story.</p></li>
+<li><p><a class="reference internal" href="api_reference/index.html"><span class="doc">API Reference</span></a> — the curated API for each
+<code class="docutils literal notranslate"><span class="pre">nvsubquadratic/</span></code> area.</p></li>
+<li><p><a class="reference internal" href="examples/index.html"><span class="doc">Examples</span></a> — per-dataset training recipes that compose
+these networks.</p></li>
+<li><p><a class="reference internal" href="ops/README.html"><span class="doc">nvsubquadratic.ops — FFT convolution primitives</span></a> — math primer for the FFT convolution primitives.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="architecture.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Architecture</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="examples/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Examples</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#layout">Layout</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#library-tree-nvsubquadratic">Library tree (<code class="docutils literal notranslate"><span class="pre">nvsubquadratic/</span></code>)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-each-top-level-directory-does">What each top-level directory does</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-to-go-next">Where to go next</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=a95f357e85573c9b56d5"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=a95f357e85573c9b56d5"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025-2026 NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
