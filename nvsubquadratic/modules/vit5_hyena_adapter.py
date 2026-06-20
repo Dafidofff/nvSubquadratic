@@ -135,6 +135,10 @@ class ViT5HyenaAdapter(nn.Module):
         self,
         inner_mixer_cfg: LazyConfig,
         grid_w: int,
+        grid_h: int | None = None,
+        register_write: bool = False,
+        hidden_dim: int | None = None,
+        pre_mixer_mask_cfg: LazyConfig | None = None,
     ):
         """Instantiate the adapter and its inner 2-D mixer.
 
@@ -148,18 +152,65 @@ class ViT5HyenaAdapter(nn.Module):
                 handles the permutation internally.  Projection dimensions
                 (``hidden_dim``, ``num_heads``, etc.) must be set inside this config;
                 the adapter itself accepts no ``hidden_dim`` argument.
-            grid_w: Width of the 2-D spatial grid.  Every call to ``forward``
-                must supply a sequence length ``T`` that satisfies
-                ``T % grid_w == 0``; the grid height is computed as
-                ``H = T // grid_w``.  In a hierarchical network, pass the
-                correct ``grid_w`` for each stage (after patch merging).  After
-                a 2× patch-merging step, ``grid_w`` halves; the network's stage
-                configuration (e.g. ``ViT5HierarchicalClassificationNet``) is the
-                source of truth for each stage's ``grid_w``.
+            grid_w: Width of the 2-D spatial grid.  In legacy (whole-sequence)
+                mode every call to ``forward`` must supply a sequence length
+                ``T`` that satisfies ``T % grid_w == 0``; the grid height is
+                computed as ``H = T // grid_w``.  In a hierarchical network,
+                pass the correct ``grid_w`` for each stage (after patch
+                merging).  After a 2× patch-merging step, ``grid_w`` halves; the
+                network's stage configuration (e.g.
+                ``ViT5HierarchicalClassificationNet``) is the source of truth for
+                each stage's ``grid_w``.
+            grid_h: Height of the 2-D spatial (patch) grid.  When ``None``
+                (default) the adapter runs in **legacy mode** and reshapes the
+                *entire* ``T``-length sequence into ``[B, T // grid_w, grid_w, C]``
+                — register/CLS/padding tokens are treated as ordinary grid
+                positions, so this only works when ``T == grid_h * grid_w``
+                exactly (i.e. ``num_registers == 0`` and no padding reaches the
+                block).  When set, the adapter runs in **register-split mode**:
+                the first ``grid_h * grid_w`` tokens are mixed as the spatial
+                patch grid and any trailing tokens (register / CLS / aux tokens)
+                are kept *off* the spatial path so they do not corrupt the
+                ``grid_h × grid_w`` FFT structure.  This is what lets a config
+                use ``num_registers > 0`` with the Hyena mixer.
+            register_write: When ``True`` (requires ``grid_h`` set and
+                ``hidden_dim`` given), the adapter writes a learned, mean-pooled
+                summary of the *mixed* patch grid into the trailing (register)
+                tokens after mixing: ``rest ← rest + W · mean(grid)``.  The write
+                projection ``W`` is **zero-initialised**, so at init the registers
+                pass through unchanged (the block is identical to the
+                ``num_registers == 0`` baseline) and the model gradually learns to
+                route per-input patch context into the registers.  Downstream
+                register→FiLM conditioning (see ``ViT5ResidualBlock``) then becomes
+                genuinely input-dependent.  When ``False`` the trailing tokens
+                pass through untouched (pure register-split).
+            hidden_dim: Channel dimension ``C`` of the tokens.  Required only
+                when ``register_write=True`` (to size the write projection);
+                ignored otherwise.
+            pre_mixer_mask_cfg: Optional lazy config for a soft spatial mask
+                applied to the ``[B, H, W, C]`` patch grid **before** the inner
+                mixer runs each block.  When ``None`` (default) no masking is
+                applied.  Intended for the P3 sparse-masking experiment
+                (:class:`~nvsubquadratic.modules.spatial_mask.SpatialSoftMask`).
         """
         super().__init__()
         self.inner_mixer = instantiate(inner_mixer_cfg)
         self.grid_w = grid_w
+        self.grid_h = grid_h
+        self.pre_mixer_mask = instantiate(pre_mixer_mask_cfg) if pre_mixer_mask_cfg is not None else None
+
+        if register_write:
+            if grid_h is None:
+                raise ValueError("register_write=True requires grid_h to be set (register-split mode).")
+            if hidden_dim is None:
+                raise ValueError("register_write=True requires hidden_dim to size the write projection.")
+            self.register_write_proj = nn.Linear(hidden_dim, hidden_dim)
+            # Zero-init so registers are unchanged at init (== num_registers=0 baseline);
+            # the model learns to route patch context into registers over training.
+            nn.init.zeros_(self.register_write_proj.weight)
+            nn.init.zeros_(self.register_write_proj.bias)
+        else:
+            self.register_write_proj = None
 
     def flop_count(self, num_tokens: int, inference: bool = False) -> int:
         """Delegate FLOPs accounting to the inner mixer.
@@ -187,8 +238,18 @@ class ViT5HyenaAdapter(nn.Module):
         Raises:
             AttributeError: If ``inner_mixer`` does not implement ``flop_count``.
         """
-        spatial_dims = (num_tokens // self.grid_w, self.grid_w)
-        return self.inner_mixer.flop_count(spatial_dims, inference=inference)
+        if self.grid_h is None:
+            spatial_dims = (num_tokens // self.grid_w, self.grid_w)
+        else:
+            # Register-split mode: the inner mixer only ever sees the patch grid.
+            spatial_dims = (self.grid_h, self.grid_w)
+        flops = self.inner_mixer.flop_count(spatial_dims, inference=inference)
+        if self.register_write_proj is not None:
+            # mean-pool over n_spatial tokens (~n*C adds) + Linear(C -> C) per sample.
+            n_spatial = self.grid_h * self.grid_w
+            C = self.register_write_proj.in_features
+            flops += n_spatial * C + 2 * C * C
+        return flops
 
     def forward(self, x: torch.Tensor, **mixer_kwargs) -> torch.Tensor:
         """Reshape to 2-D grid, apply the inner mixer, reshape back.
@@ -232,11 +293,46 @@ class ViT5HyenaAdapter(nn.Module):
                 total element count.
         """
         B, T, C = x.shape
-        x = x.reshape(B, T // self.grid_w, self.grid_w, C)
-        x = self.inner_mixer(x, **mixer_kwargs)
-        x = x.reshape(B, T, C)
-        return x
+
+        # Legacy whole-sequence mode: reshape every token into the grid.
+        if self.grid_h is None:
+            x = x.reshape(B, T // self.grid_w, self.grid_w, C)
+            if self.pre_mixer_mask is not None:
+                x = self.pre_mixer_mask(x)
+            x = self.inner_mixer(x, **mixer_kwargs)
+            x = x.reshape(B, T, C)
+            return x
+
+        # Register-split mode: only the first grid_h * grid_w tokens form the
+        # spatial patch grid; trailing tokens (registers / CLS / aux) are kept
+        # off the spatial path so they cannot corrupt the FFT grid structure.
+        n_spatial = self.grid_h * self.grid_w
+        if T < n_spatial:
+            raise RuntimeError(
+                f"ViT5HyenaAdapter register-split: sequence length T={T} is smaller than the "
+                f"spatial grid grid_h*grid_w={n_spatial} (grid_h={self.grid_h}, grid_w={self.grid_w})."
+            )
+
+        grid = x[:, :n_spatial].reshape(B, self.grid_h, self.grid_w, C)
+        if self.pre_mixer_mask is not None:
+            grid = self.pre_mixer_mask(grid)
+        grid = self.inner_mixer(grid, **mixer_kwargs)
+        grid = grid.reshape(B, n_spatial, C)
+
+        rest = x[:, n_spatial:]  # [B, T - n_spatial, C] register / aux tokens
+        if self.register_write_proj is not None and rest.shape[1] > 0:
+            # Route a learned, mean-pooled summary of the mixed patch grid into
+            # the register tokens so register->FiLM conditioning is input-dependent.
+            summary = self.register_write_proj(grid.mean(dim=1))  # [B, C]
+            rest = rest + summary.unsqueeze(1)
+
+        return torch.cat([grid, rest], dim=1)
 
     def extra_repr(self) -> str:
-        """Return the string ``'grid_w=<value>'`` inserted into PyTorch's module repr."""
-        return f"grid_w={self.grid_w}"
+        """Return grid dims (and register-write / pre-mask flags) inserted into PyTorch's module repr."""
+        s = f"grid_w={self.grid_w}"
+        if self.grid_h is not None:
+            s += f", grid_h={self.grid_h}, register_write={self.register_write_proj is not None}"
+        if self.pre_mixer_mask is not None:
+            s += f", pre_mixer_mask={type(self.pre_mixer_mask).__name__}"
+        return s

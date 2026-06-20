@@ -992,8 +992,21 @@ class SIRENKernelND(torch.nn.Module):
         hidden_omega_0: float = 1.0,
         film_cfg: LazyConfig | None = None,
         film_after_pos_embed: bool = False,
+        film_layers: Sequence[int] | None = None,
     ):
-        """Build SIREN MLP and optional FiLM conditioner."""
+        """Build SIREN MLP and optional FiLM conditioner.
+
+        ``film_layers`` selects *which* SIREN hidden layers receive FiLM
+        modulation (the "last layer only" vs. "all hidden layers" ablation):
+
+        - ``None`` (default): modulate **all** hidden layers — the original
+          behaviour.
+        - a sequence of hidden-layer indices (Python-style, so ``-1`` is the
+          last hidden layer, e.g. ``[-1]`` for last-layer-only): modulate only
+          those. The FiLM generator must then produce exactly
+          ``len(film_layers) + int(film_after_pos_embed)`` ``(gamma, beta)``
+          pairs, applied to the selected layers in ascending index order.
+        """
         super().__init__()
         self.film_after_pos_embed = film_after_pos_embed
 
@@ -1032,8 +1045,21 @@ class SIRENKernelND(torch.nn.Module):
             self.hidden_linears.append(torch.nn.Linear(mlp_hidden_dim, mlp_hidden_dim, bias=use_bias))
         self.sine = Sine()
 
-        # Number of hidden layers that can be FiLM-conditioned (all of them)
-        self.num_film_layers = len(self.hidden_linears)
+        # Which hidden layers receive FiLM (default: all of them). Normalised to
+        # sorted, de-duplicated, non-negative indices. ``self.num_film_layers`` is
+        # the count of FiLM-modulated *hidden* layers (excludes the optional
+        # post-positional-embedding FiLM, which is tracked by film_after_pos_embed).
+        num_hidden = len(self.hidden_linears)
+        if film_layers is None:
+            self._film_layer_indices = list(range(num_hidden))
+        else:
+            normalised = sorted({int(i) % num_hidden for i in film_layers})
+            if not normalised:
+                raise ValueError(f"film_layers must select at least one layer, got {film_layers!r}")
+            self._film_layer_indices = normalised
+        # Map hidden-layer index -> position in the FiLM generator's output list.
+        self._film_layer_pos = {layer_idx: pos for pos, layer_idx in enumerate(self._film_layer_indices)}
+        self.num_film_layers = len(self._film_layer_indices)
 
         # Construct output linear layer of the kernel network
         self.out_linear = torch.nn.Linear(mlp_hidden_dim, out_dim, bias=use_bias)
@@ -1060,13 +1086,13 @@ class SIRENKernelND(torch.nn.Module):
         # Optional FiLM conditioning
         if film_cfg is not None:
             self.film_generator = instantiate(film_cfg)
-            expected_film_layers = len(self.hidden_linears) + int(self.film_after_pos_embed)
+            expected_film_layers = self.num_film_layers + int(self.film_after_pos_embed)
             if self.film_generator.num_film_layers != expected_film_layers:
                 raise ValueError(
                     f"film_generator.num_film_layers={self.film_generator.num_film_layers} "
                     f"does not match expected {expected_film_layers} "
-                    f"(len(hidden_linears)={len(self.hidden_linears)} + "
-                    f"int(film_after_pos_embed)={int(self.film_after_pos_embed)})"
+                    f"(modulated hidden layers={self.num_film_layers} at indices "
+                    f"{self._film_layer_indices} + int(film_after_pos_embed)={int(self.film_after_pos_embed)})"
                 )
         else:
             self.film_generator = None
@@ -1138,7 +1164,7 @@ class SIRENKernelND(torch.nn.Module):
         # 4. FiLM conditioning
         if has_film:
             flops += self.film_generator.flop_count()
-            num_modulated = len(self.hidden_linears)
+            num_modulated = self.num_film_layers
             if self.film_after_pos_embed:
                 num_modulated += 1
             # gamma * h + beta = 2 elementwise ops per grid point per hidden_dim
@@ -1182,8 +1208,8 @@ class SIRENKernelND(torch.nn.Module):
         h = pos_emb
         for i, linear in enumerate(self.hidden_linears):
             h = self.sine(linear(h))
-            if film_params is not None:
-                gamma, beta = film_params[i + film_offset]
+            if film_params is not None and i in self._film_layer_pos:
+                gamma, beta = film_params[self._film_layer_pos[i] + film_offset]
                 # Reshape [B, hidden_dim] -> [B, 1, ..., 1, hidden_dim] for broadcasting over spatial dims
                 shape = [gamma.shape[0]] + [1] * self.data_dim + [gamma.shape[-1]]
                 gamma = gamma.view(*shape)

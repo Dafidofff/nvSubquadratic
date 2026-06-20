@@ -1258,9 +1258,9 @@ class CKConvND(torch.nn.Module):
         conditioning = mixer_kwargs.get("conditioning", None)
         conv_kernel, grid = self.kernel(grid_lens, conditioning=conditioning)
 
-        # Apply mask to kernel
+        # Apply mask to kernel (pass conditioning so dynamic masks can use it)
         if not isinstance(self.mask, torch.nn.Identity):
-            conv_kernel = self.mask(grid=grid, x=conv_kernel)
+            conv_kernel = self.mask(grid=grid, x=conv_kernel, conditioning=conditioning)
 
         # For causal convolution, crop the kernel to use only the "positive" half
         # (i.e., the part that looks backward in time). The kernel is in BLH format: [1, L, H].

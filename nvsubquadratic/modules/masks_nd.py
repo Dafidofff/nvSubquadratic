@@ -553,7 +553,7 @@ class GaussianModulationND(torch.nn.Module):
             f"  init_extent (per axis): ({extent_str})\n" + "\n".join(per_axis_lines)
         )
 
-    def forward(self, grid: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, grid: torch.Tensor, x: torch.Tensor, **kwargs) -> torch.Tensor:
         r"""Apply Gaussian spatial modulation element-wise to kernel features.
 
         For each spatial position :math:`p` and channel :math:`c` computes:
@@ -574,6 +574,8 @@ class GaussianModulationND(torch.nn.Module):
                 values in ``[−1, 1]``.  Must be ``torch.float32``.
             x: Kernel feature tensor of shape ``[B, *spatial_dims, num_channels]``.
                 ``*spatial_dims`` must match the spatial shape of ``grid``.
+            **kwargs: Ignored — present so subclasses and callers that pass
+                ``conditioning=...`` do not need to branch on mask type.
 
         Returns:
             torch.Tensor: Modulated features with the same shape and dtype as
@@ -672,6 +674,127 @@ class BlockAlignedGaussianModulationND(GaussianModulationND):
         # block-structured SIREN kernel.
         with torch.no_grad():
             self.std_param.data.copy_(self.std_param.data.flip(dims=[-1]))
+
+
+class DynamicGaussianModulationND(GaussianModulationND):
+    r"""Gaussian envelope with per-input shift and dilation predicted from a conditioning vector.
+
+    Extends :class:`GaussianModulationND` with a small conditioning head:
+
+    .. code-block:: none
+
+        conditioning [B, cond_dim]
+            -> 2-layer MLP
+            -> shift    [B, data_dim]   (per-axis translation of the envelope centre)
+            -> log_scale [B, data_dim]  (per-axis log-dilation of the std)
+
+    The effective forward is:
+
+    .. math::
+
+        m_c(p) = \prod_{d} \exp\!\Bigl(
+            -\tfrac{1}{2}\bigl((p_d - \delta_d) /
+            (\sigma_{d,c} \cdot e^{s_d})\bigr)^2\Bigr)
+
+    where :math:`(\delta_d, s_d)` are predicted per-input from ``conditioning``.
+
+    **Identity at init:** the MLP output projection is zero-initialised so that
+    at step 0, :math:`\delta = 0` and :math:`s = 0`, which recovers the static
+    :class:`GaussianModulationND` behaviour exactly.  The mechanism is learned
+    from there.
+
+    Args:
+        data_dim: Number of spatial/temporal dimensions.
+        num_channels: Number of feature channels ``C`` to modulate.
+        grid_size: Number of grid points per spatial dimension.
+        cond_dim: Dimensionality of the conditioning vector ``[B, cond_dim]``.
+        head_hidden_dim: Hidden width of the 2-layer conditioning MLP.
+            Default ``32``.
+        min_attenuation_at_step: See :class:`GaussianModulationND`.
+        max_attenuation_at_limit: See :class:`GaussianModulationND`.
+        init_extent: See :class:`GaussianModulationND`.
+        parametrization: See :class:`GaussianModulationND`.
+    """
+
+    def __init__(
+        self,
+        data_dim: int,
+        num_channels: int,
+        grid_size: int,
+        cond_dim: int,
+        head_hidden_dim: int = 32,
+        min_attenuation_at_step: float = 0.1,
+        max_attenuation_at_limit: float = 0.95,
+        init_extent: float | Sequence[float] = 1.0,
+        parametrization: str = "direct",
+    ):
+        """Initialise static Gaussian base then attach the dynamic conditioning head."""
+        super().__init__(
+            data_dim=data_dim,
+            num_channels=num_channels,
+            grid_size=grid_size,
+            min_attenuation_at_step=min_attenuation_at_step,
+            max_attenuation_at_limit=max_attenuation_at_limit,
+            init_extent=init_extent,
+            parametrization=parametrization,
+        )
+        self._warp_head = torch.nn.Sequential(
+            torch.nn.Linear(cond_dim, head_hidden_dim),
+            torch.nn.SiLU(),
+            torch.nn.Linear(head_hidden_dim, 2 * data_dim),
+        )
+        # Zero-init so shift=0 and log_scale=0 at step 0 → identical to static base.
+        torch.nn.init.zeros_(self._warp_head[-1].weight)
+        torch.nn.init.zeros_(self._warp_head[-1].bias)
+
+    def forward(
+        self,
+        grid: torch.Tensor,
+        x: torch.Tensor,
+        conditioning: torch.Tensor | None = None,
+        **kwargs,
+    ) -> torch.Tensor:
+        r"""Apply dynamic Gaussian modulation conditioned on per-input warp parameters.
+
+        When ``conditioning`` is ``None`` (e.g., during kernel-only forward
+        passes without register tokens) falls back to the static base behaviour.
+
+        Args:
+            grid: ``[1, *spatial_dims, data_dim]``, float32 coordinate grid.
+            x: ``[B, *spatial_dims, num_channels]`` kernel features.
+            conditioning: ``[B, cond_dim]`` per-input context vector (from
+                register tokens via :class:`~nvsubquadratic.modules.film.RegisterPooling`).
+                If ``None``, behaves identically to :class:`GaussianModulationND`.
+            **kwargs: Absorbed for forward-compatibility.
+
+        Returns:
+            Modulated features, same shape and dtype as ``x``.
+        """
+        assert grid.dtype == torch.float32, f"grid must be float32, got {grid.dtype}"
+        std = self._compute_std()  # [data_dim, num_channels]
+
+        if conditioning is None:
+            exponent = -0.5 * torch.einsum("b...d,dc->b...c", grid.square(), std.square().reciprocal())
+        else:
+            warp = self._warp_head(conditioning.float())  # [B, 2*data_dim]
+            shift = warp[:, : self.data_dim]  # [B, data_dim]
+            log_scale = warp[:, self.data_dim :]  # [B, data_dim]
+
+            # Broadcast shift over spatial dims: [B, 1, ..., 1, data_dim]
+            n_spatial = x.ndim - 2
+            shift_view = shift.view(shift.shape[0], *(1,) * n_spatial, self.data_dim)
+            grid_shifted = grid - shift_view  # [B, *spatial, data_dim]
+
+            # scaled_std: [B, data_dim, num_channels]
+            scaled_std = std.unsqueeze(0) * log_scale.exp().unsqueeze(-1)
+            exponent = -0.5 * torch.einsum(
+                "b...d,bdc->b...c",
+                grid_shifted.square(),
+                scaled_std.square().reciprocal(),
+            )
+
+        gauss = exponent.exp_().to(x.dtype)
+        return x * gauss
 
 
 if __name__ == "__main__":
