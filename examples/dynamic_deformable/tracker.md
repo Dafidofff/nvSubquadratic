@@ -493,5 +493,36 @@ importing them from `dali_imagenet_fused`, which pulls in `nvidia.dali` at modul
 on ivi). Runs on ivi `all6000` (rtx_6000) via git worktree of the `dynamic-deformable` branch.
 
 - **2026-06-20** — TinyImageNet P0/P5 configs (patch-8) written + build-validated locally (39,050
-  total iters = 50 ep × 781). Deploying to ivi via worktree; smoke test then 3-seed launch on all6000.
-  Patch-4 variant queued for after patch-8 completes.
+  total iters = 50 ep × 781). Deployed to ivi via git worktree (`~/code/nvSubquadratic-dd`, branch
+  `dynamic-deformable`, shipped by bundle — local has no GitHub push rights). Both configs smoke-tested
+  on all6000 (exit 0; loss ≈ ln(200) = 5.3 at init, P5 `val/mask_density` ≈ 0.5). **3-seed P0+P5 sweep
+  launched on all6000** (debug=false, online W&B): jobs 187699 (tin-p0-s42) / 187700 (p5-s42) /
+  187701 (p0-s43) / 187702 (p5-s43) / 187703 (p0-s44) / 187704 (p5-s44). Run dir
+  `/ivi/zfs/s0/original_homes/dwessel/nvsubq-runs/dynamic_deformable/tin_{p0,p5}_patch8_seed{42,43,44}`.
+  Patch-4 variant (`PATCH_SIZE=4`, 256-token grid) queued for after patch-8 completes.
+  **Gap to compare:** CIFAR-10 P5−P0 = +0.92 pp; does it widen on TinyImageNet-200?
+- **2026-06-21** — **TinyImageNet patch-8 (64-token) COMPLETE** (6 jobs, ~50–60 min each, all exit 0).
+  val/acc (= test/acc; the datamodule's test split *is* the 10k valid set):
+  | Phase | seed42 | seed43 | seed44 | mean |
+  | P0 baseline | 47.9 | 47.8 | 47.3 | **47.67 ± 0.31%** |
+  | P5 combined | 47.1 | 47.2 | 46.4 | **46.90 ± 0.44%** |
+  **Δ(P5−P0) = −0.77 pp** — the gap did not grow, it **flipped sign** (CIFAR-10 was +0.92 pp).
+  Consistent across seeds (every P0 seed > every P5 seed). At matched 64-token grid the
+  dynamic-deformable stack (FiLM + sparse mask) slightly *hurts* on the 200-class task. Open question:
+  is this a grid-resolution effect? → patch-4 (256-token) launched to test whether the mechanisms need
+  more spatial structure to pay off. Jobs 187953–187958, run dir `.../tin_{p0,p5}_patch4_seed{42,43,44}`.
+- **2026-06-22** — **TinyImageNet patch-4 (256-token) COMPLETE** (6 jobs, ~1h20m P0 / ~1h44m P5, all exit 0).
+  val/acc:
+  | Phase | seed42 | seed43 | seed44 | mean |
+  | P0 baseline | 54.4 | 54.2 | 53.9 | **54.17 ± 0.25%** |
+  | P5 combined | 54.4 | 54.2 | 53.1 | **53.90 ± 0.70%** |
+  **Δ(P5−P0) = −0.27 pp** (within noise; P5 ties P0 on seeds 42/43, only seed44 lower). More tokens lift
+  absolute accuracy a lot (48% → 54%) but the deformable gap stays ≈0/slightly negative.
+- **2026-06-22 — TinyImageNet difficulty-scaling CONCLUDED.** The CIFAR-10 P5−P0 expressivity gain
+  (+0.92 pp) does **not** transfer to the harder 200-class task: patch-8 −0.77 pp, patch-4 −0.27 pp
+  (within noise). The gap does not widen with difficulty — it vanishes/inverts. Adding spatial
+  structure (patch-4) recovers it from −0.77 toward 0 but never positive. **Takeaway:** the
+  dynamic-deformable mechanisms (spectral FiLM + sparse mask) are a CIFAR-10-specific gain, not a
+  robust expressivity win on harder classification. Worth probing whether the WSI/pathology target
+  (where most of the image really is irrelevant background) behaves more like the sparse-mask's
+  best case than TinyImageNet does.
