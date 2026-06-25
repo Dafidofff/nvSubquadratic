@@ -2,7 +2,7 @@
 
 **W&B project:** [`implicit-long-convs/nvsubquadratic`](https://wandb.ai/implicit-long-convs/nvsubquadratic) · **W&B group:** `dynamic-deformable`
 **Starting task:** CIFAR-10 classification (32×32 RGB, 10 classes, 50k train / 10k test)
-**Status:** ✅ P1–P5 all complete (2026-06-15/19, local RTX 3090). **P5 combined (P1+P3 SW=0.5): 88.70 ± 0.14% (+0.92 pp vs P0)** — clear best, slightly sub-additive (−0.30 pp vs naive sum). P1-all: +0.57 pp. P3 SW=0.5: +0.65 pp. P2/P4: eliminated. P3 gradient bug fixed 2026-06-18 (detached `_last_mean_mask`; all P3 runs re-executed). CIFAR-10 series complete. · 🔬 **Difficulty-scaling extension (2026-06-20, in progress):** replicating P0 vs P5 on **TinyImageNet** (200-class, native 64×64) on ivi `all6000` to test whether the expressivity gap grows on a harder task — see "TinyImageNet difficulty scaling" section below.
+**Status:** ✅ P1–P5 all complete (2026-06-15/19, local RTX 3090). **P5 combined (P1+P3 SW=0.5): 88.70 ± 0.14% (+0.92 pp vs P0)** — clear best, slightly sub-additive (−0.30 pp vs naive sum). P1-all: +0.57 pp. P3 SW=0.5: +0.65 pp. P2/P4: eliminated. P3 gradient bug fixed 2026-06-18 (detached `_last_mean_mask`; all P3 runs re-executed). CIFAR-10 series complete. · ✅ **Difficulty-scaling extension CONCLUDED (2026-06-22):** P0 vs P5 replicated on **TinyImageNet** (200-class, native 64×64, ivi `all6000`, 3 seeds each). The CIFAR-10 +0.92 pp gain does **not** transfer to the harder task — it vanishes/inverts: **patch-8 (64-token) Δ = −0.77 pp**, **patch-4 (256-token) Δ = −0.27 pp** (within noise). The dynamic-deformable gap does not widen with difficulty; the CIFAR-10 win looks task-specific. See "TinyImageNet difficulty scaling" section below.
 
 ## Research thesis
 
