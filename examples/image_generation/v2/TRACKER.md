@@ -70,11 +70,16 @@ Effective batch is wall-clock bounded; log it/s + steps reached (Hyena ~slower p
 step at 4096 tokens than jit_baseline; pixel-level attention slowest — equal 2-day
 wall-clock ⇒ unequal step counts, expected).
 
+Launched **2026-06-26** (hipster, online W&B `dafidofff/nvsubquadratic`):
+
 | Model | Job ID | W&B run | batch/GPU × accum | eff batch | it/s | steps @ 48h | val/loss | status |
 | ----- | ------ | ------- | ----------------- | --------- | ---- | ----------- | -------- | ------ |
-| jit_baseline   | _tbd_ | _tbd_ | 128 × 1 | 256 | | | | 📝 not launched |
-| vit5_attention | _tbd_ | _tbd_ | 16 × 8  | 256 | | | | 📝 not launched |
-| vit5_hyena     | _tbd_ | _tbd_ | 32 × 4  | 256 | | | | 📝 not launched |
+| jit_baseline   | 301147 | [4kbEHQvg](https://wandb.ai/dafidofff/nvsubquadratic/runs/4kbEHQvg) | 128 × 1 | 256 | ~1.24 | | | ⏳ running |
+| vit5_attention | 301149 | [XjLeJkm5](https://wandb.ai/dafidofff/nvsubquadratic/runs/XjLeJkm5) | 16 × 8  | 256 | _tbd_ | | | ⏳ running |
+| vit5_hyena     | 301148 | [GQoTqp6K](https://wandb.ai/dafidofff/nvsubquadratic/runs/GQoTqp6K) | 32 × 4  | 256 | _tbd_ | | | ⏳ running |
+
+Smoke test (job 301142, 1-GPU) passed all three. jit loss dropping cleanly
+(1.0 → 0.28 over ~350 steps) confirms the pipeline learns.
 
 ## Investigation roadmap
 
