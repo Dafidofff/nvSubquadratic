@@ -437,6 +437,7 @@ class Attention(torch.nn.Module):
         key: torch.Tensor,
         value: torch.Tensor,
         cp_group: torch.distributed.ProcessGroup = None,
+        **kwargs,
     ) -> torch.Tensor:
         r"""Apply multi-head scaled dot-product attention.
 

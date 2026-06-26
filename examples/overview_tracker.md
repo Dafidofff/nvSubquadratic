@@ -44,14 +44,18 @@ Status Legend:
 | 📝 Todo | P2       | @Unassigned  | Conduct a patch size analysis.                                                     |                                           |
 | 📝 Todo | P2       | @Unassigned  | Evaluate if Hyena UNext can achieve (i) better performance, and (ii) faster speed. |                                           |
 
-## ImageNet (Diffusion) (Note: This needs some extra planning)
+## Image Generation (Diffusion)
 
-**Tracker Document:** *To be defined*
+**Tracker Document:** [examples/image_generation/v2/TRACKER.md](image_generation/v2/TRACKER.md)
+(prior un-run ImageNet matrix archived in `examples/image_generation/v1/`)
+
+Initial investigation on **TinyImageNet 64×64** (cheap proxy), scaling to full
+ImageNet next. Attention baseline vs pixel-level Hyena, JiT-B as DiT reference.
 
 | Status  | Priority | Assignee     | Task                                                                               | Links / Configs / Notes |
 | :------ | :------- | :----------- | :--------------------------------------------------------------------------------- | :---------------------- |
-| 📝 Todo | P0       | @david&david | Define a tracker.md file containing all in-depth experiments.                      |                         |
-| 📝 Todo | P0       | @Knigge?     | Obtain baseline vs standard Hyena values (e.g., 8 DiT vs 40 Hyena FID).            |                         |
+| ✅ Done | P0       | @david&david | Define a tracker.md file containing all in-depth experiments.                      | image_generation/v2/TRACKER.md |
+| ⏳ WIP  | P0       | @Knigge?     | Obtain baseline vs standard Hyena values (e.g., 8 DiT vs 40 Hyena FID).            | TinyImageNet 2-GPU runs (P0) |
 | 📝 Todo | P1       | @Unassigned  | Run the masking experiment for Hyena.                                              |                         |
 | 📝 Todo | P2       | @Unassigned  | Perform hyperparameter ablations (lr, omega0, weight decay, drop path rate).       |                         |
 | 📝 Todo | P2       | @Unassigned  | Conduct a patch size analysis.                                                     |                         |

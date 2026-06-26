@@ -26,6 +26,7 @@ that loads TinyImageNet (or any ImageNet-style HF dataset) via
 - Optional label dropping (unsupervised pre-training).
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, Tuple
 
@@ -40,12 +41,36 @@ from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
 from experiments.datamodules._deprecated.ref_imagenet import ThreeAugment
-from experiments.datamodules.dali_imagenet_fused import AugmentConfig, MixupConfig
+
+
+# Copied from dali_imagenet_fused to avoid the nvidia.dali import at module level
+# (DALI is not installed on every cluster; the HF-backed loader does not need it).
+@dataclass
+class MixupConfig:
+    mixup: float = 0.0
+    cutmix: float = 0.0
+    mixup_prob: float = 1.0
+    mixup_switch_prob: float = 0.5
+    mixup_mode: str = "batch"
+    smoothing: float = 0.1
+
+
+@dataclass
+class AugmentConfig:
+    use_three_augment: bool = False
+    color_jitter: float = 0.4
+    rand_augment: Optional[str] = None
+    random_erasing_prob: float = 0.0
+    random_erasing_mode: str = "pixel"
+    num_repeats: int = 1
 
 
 # TinyImageNet statistics
 TINYIMAGENET_MEAN = [0.4802, 0.4481, 0.3975]
 TINYIMAGENET_STD = [0.2302, 0.2265, 0.2262]
+TINYIMAGENET_NUM_CLASSES = 200
+TINYIMAGENET_IMAGE_SIZE = 64
+TINYIMAGENET_TRAIN_SIZE = 100_000
 
 
 class _TinyImageNetDataset(Dataset):
