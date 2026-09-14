@@ -2413,7 +2413,8 @@ class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
             None. Populates the corresponding dataset attributes.
         """
         base = self._instantiate_base_datamodule()
-        base.setup(stage)
+        # MNIST/EMNIST initialize their validation split during fit setup.
+        base.setup("fit" if stage == "validate" else stage)
         self._extract_base_properties()
 
         if stage in ("fit", None):

@@ -166,11 +166,29 @@ def test_datamodule_split_loaders_and_batch_layout(data_type):
             assert batch["label"].shape == (2, 6**3, 1)
 
 
-def test_validate_stage_creates_validation_loader():
-    dm = datamodule()
+def test_validate_stage_creates_validation_loader(monkeypatch):
+    from experiments.datamodules import emnist
+
+    # Exercise the documented base module's real stage dispatch without downloads.
+    monkeypatch.setattr(emnist.datasets, "EMNIST", lambda *args, **kwargs: images())
+    dm = datamodule(
+        base_datamodule_cfg=LazyConfig(emnist.EMNISTDataModule)(
+            data_dir="unused",
+            batch_size=2,
+            num_workers=0,
+            pin_memory=False,
+            data_type="image",
+            permuted=False,
+            seed=7,
+            use_test_as_val=True,
+        )
+    )
     dm.setup("validate")
     assert dm.train_dataset is None
     assert len(dm.val_dataloader()) == 2
+    canvas, target = next(iter(dm.val_dataloader()))
+    assert canvas.shape == (2, 1, 12, 12, 12)
+    assert target.shape == (2, 1, 6, 6, 6)
 
 
 def test_datamodule_validation_precedes_base_instantiation():
