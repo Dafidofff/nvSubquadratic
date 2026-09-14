@@ -1,5 +1,17 @@
-# TODO: Add license header here
-
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Implicit / learned kernel parametrisations for N-dimensional convolutional filters.
 
@@ -379,7 +391,7 @@ class RandomFourierPositionalEmbeddingND(torch.nn.Module):
 
         # Construct slice objects to index the grid cache.
         slices = [slice(offset, offset + (seq_len * 2) - 1) for offset, seq_len in zip(offsets, seq_lens)]
-        grid = self.grid_cache[:, *slices]
+        grid = self.grid_cache[(slice(None), *slices)]
 
         # Compute the linear projection. We need to ensure that the linear projection is done in float32.
         linear_dtype = self.linear.weight.dtype
@@ -844,7 +856,7 @@ class SIRENPositionalEmbeddingND(torch.nn.Module):
 
         # Construct slice objects to index the grid cache.
         slices = [slice(offset, offset + (seq_len * 2) - 1) for offset, seq_len in zip(offsets, seq_lens)]
-        grid = self.grid_cache[:, *slices]  # type: ignore
+        grid = self.grid_cache[(slice(None), *slices)]  # type: ignore
 
         # Compute the linear projection.
         linear_dtype = self.linear.weight.dtype
@@ -1064,34 +1076,28 @@ class SIRENKernelND(torch.nn.Module):
 
         At ``inference=True`` with no FiLM generator, returns 0 because the
         kernel is input-independent and can be precomputed once and cached.
-        When a ``film_generator`` exists, the kernel is input-dependent (via
-        register-conditioned FiLM modulation) and must be recomputed every
+        When a ``film_generator`` exists the kernel is input-dependent (via
+        register-conditioned FiLM modulation) and must be recomputed on every
         forward pass regardless of the inference flag.
 
-        Let G = prod(2 * L_i - 1 for L_i in grid_lens) = total grid points.
+        Let ``G = prod(2 * L_i - 1 for L_i in grid_lens)`` be the total grid
+        points.  FLOPs breakdown:
 
-        FLOPs breakdown:
-          1. Positional embedding (``SIRENPositionalEmbeddingND``):
-             Linear(``self.data_dim``, ``self.embedding_dim``) on G points:
-               2 * G * data_dim * embedding_dim
-             + sin activation: G * embedding_dim
-
-          2. Hidden SIREN layers (``len(self.hidden_linears)`` = num_layers - 1):
-             First:  Linear(embedding_dim, mlp_hidden_dim) + sin
-               2 * G * embedding_dim * mlp_hidden_dim  +  G * mlp_hidden_dim
-             Rest:   Linear(mlp_hidden_dim, mlp_hidden_dim) + sin  (each)
-               2 * G * mlp_hidden_dim * mlp_hidden_dim  +  G * mlp_hidden_dim
-
-          3. Output linear:
-             Linear(``self.mlp_hidden_dim``, ``self.out_dim``) on G points:
-               2 * G * mlp_hidden_dim * out_dim
-
-          4. FiLM conditioning (only when ``self.film_generator`` is not None):
-             a. FiLM generator MLP:  ``self.film_generator.flop_count()``
-             b. Per modulated layer:  gamma * h + beta = 2 * G * mlp_hidden_dim
-                Applied to each hidden layer, plus the positional embedding
-                when ``self.film_after_pos_embed`` is True.
-                (Note: film_after_pos_embed requires embedding_dim == mlp_hidden_dim.)
+        - **Positional embedding** (:class:`SIRENPositionalEmbeddingND`):
+          ``2 * G * data_dim * embedding_dim`` for the linear, plus
+          ``G * embedding_dim`` for the ``sin`` activation.
+        - **Hidden SIREN layers** (``len(self.hidden_linears) = num_layers - 1``).
+          First layer: ``2 * G * embedding_dim * mlp_hidden_dim`` plus
+          ``G * mlp_hidden_dim`` for the sin.  Each subsequent layer:
+          ``2 * G * mlp_hidden_dim * mlp_hidden_dim`` plus
+          ``G * mlp_hidden_dim`` for the sin.
+        - **Output linear**: ``2 * G * mlp_hidden_dim * out_dim``.
+        - **FiLM conditioning** (only when ``self.film_generator`` is set):
+          the FiLM generator MLP costs ``self.film_generator.flop_count()``;
+          applying ``gamma * h + beta`` per modulated layer costs
+          ``2 * G * mlp_hidden_dim`` and is applied to each hidden layer
+          (plus the positional embedding when ``film_after_pos_embed`` is
+          ``True`` — which requires ``embedding_dim == mlp_hidden_dim``).
 
         Args:
             grid_lens: Per-axis output sequence lengths — the same tuple you
@@ -1147,14 +1153,14 @@ class SIRENKernelND(torch.nn.Module):
 
         Args:
             seq_lens: Lengths of the input grid for which to compute the positional embeddings.
-            conditioning: Optional [B, C] conditioning vector for FiLM modulation.
-                When provided and a film_generator exists, SIREN hidden layers are
-                modulated, making the output kernel batch-dependent: [B, *spatial, out_dim].
-                When None, behaves identically to the original SIREN: [1, *spatial, out_dim].
+            conditioning: Optional ``[B, C]`` conditioning vector for FiLM modulation.
+                When provided and a ``film_generator`` exists, SIREN hidden layers are
+                modulated, making the output kernel batch-dependent: ``[B, *spatial, out_dim]``.
+                When ``None``, behaves identically to the original SIREN: ``[1, *spatial, out_dim]``.
 
         Returns:
-            tuple: (kernel, grid) where kernel has shape [1|B, *spatial, out_dim]
-                and grid has shape [1, *spatial, data_dim].
+            ``(kernel, grid)`` where ``kernel`` has shape ``[1|B, *spatial, out_dim]``
+            and ``grid`` has shape ``[1, *spatial, data_dim]``.
         """
         # Generate FiLM parameters if conditioning is available
         film_params = None
@@ -1478,9 +1484,9 @@ class BlockDiagonalMultiOmegaSIRENKernelND(MultiOmegaSIRENKernelND):
     divisible by ``num_blocks``.
 
     Production defaults (chosen from a spectral-coverage study on the N=29
-    grid used by the vit5_hybrid config):
-        ``num_blocks=8``, ``omega_0_min=1.0``, ``omega_0_max=12.0``,
-        ``schedule="linear"``, ``off_block_scale=0.1``.
+    grid used by the ``vit5_hybrid`` config): ``num_blocks=8``,
+    ``omega_0_min=1.0``, ``omega_0_max=12.0``, ``schedule="linear"``,
+    ``off_block_scale=0.1``.
 
     When changing grid resolution by a factor ``m``, the schedule should be
     scaled uniformly by ``m`` (``omega_0_min *= m``, ``omega_0_max *= m``) to
@@ -1892,7 +1898,7 @@ class LearnableOmegaSIRENPositionalEmbeddingND(SIRENPositionalEmbeddingND):
         # Slice the cached grid to the requested per-axis lengths.
         offsets = [L - sl for L, sl in zip(self.L_cache_per_axis, seq_lens)]
         slices = [slice(off, off + (sl * 2) - 1) for off, sl in zip(offsets, seq_lens)]
-        grid = self.grid_cache[:, *slices]  # type: ignore
+        grid = self.grid_cache[(slice(None), *slices)]  # type: ignore
 
         # ── float32 inner block: linear → multiplier → sin ────────────────
         # We force fp32 for the matmul, the per-row multiplier, and the sine
@@ -1949,24 +1955,29 @@ class LearnableOmegaSIRENKernelND(SIRENKernelND):
     ``[omega_0 · omega_0_scale_min, omega_0 · omega_0_scale_max]``.
 
     Args:
-        out_dim, data_dim, mlp_hidden_dim, num_layers, embedding_dim, L_cache,
-        use_bias, hidden_omega_0, film_cfg, film_after_pos_embed:
-            Same as :class:`SIRENKernelND`.
         omega_0: Constant scalar absorbed into the per-iteration ``2π·ω₀``
             factor inside the first-layer sine.
         omega_0_scale_init: Initial value of the learnable per-row scale —
             either a single float (default ``1.0``) or a 1-D sequence/tensor
             of length ``embedding_dim``.  See
             :class:`LearnableOmegaSIRENPositionalEmbeddingND` for details.
-        omega_0_scale_min, omega_0_scale_max: Clamp bounds on the scale.
-        apply_lr_scale: Forwarded to the positional embedding.  Default False.
+        omega_0_scale_min: Lower clamp on the per-row scale.
+        omega_0_scale_max: Upper clamp on the per-row scale.
+        apply_lr_scale: Forwarded to the positional embedding.  Default
+            ``False``.
+
+    All other constructor arguments (``out_dim``, ``data_dim``,
+    ``mlp_hidden_dim``, ``num_layers``, ``embedding_dim``, ``L_cache``,
+    ``use_bias``, ``hidden_omega_0``, ``film_cfg``, ``film_after_pos_embed``)
+    have the same meaning as in :class:`SIRENKernelND`.
 
     Attributes:
         positional_embedding (LearnableOmegaSIRENPositionalEmbeddingND): First
             layer with learnable per-row omega_0 scale; replaces the parent's
             ``SIRENPositionalEmbeddingND``.
-        hidden_linears, sine, out_linear, film_generator:
-            Inherited from :class:`SIRENKernelND`; see that class.
+
+    The attributes ``hidden_linears``, ``sine``, ``out_linear`` and
+    ``film_generator`` are inherited unchanged from :class:`SIRENKernelND`.
     """
 
     def __init__(
@@ -2061,15 +2072,14 @@ class BlockDiagonalLearnableOmegaSIRENKernelND(LearnableOmegaSIRENKernelND):
     largest update step size in AdamW.
 
     Args:
-        out_dim, data_dim, mlp_hidden_dim, num_layers, embedding_dim,
-        L_cache, use_bias, hidden_omega_0, film_cfg, film_after_pos_embed:
-            Same as :class:`SIRENKernelND`.
         num_blocks: Number of ω₀ blocks; must divide ``embedding_dim``,
             ``mlp_hidden_dim``, and ``out_dim``.
-        omega_0_min, omega_0_max: Endpoints of the schedule (also set the
-            constant runtime ``2π · omega_0_max`` factor — pulled out of the
-            weight init).  Ignored if ``omega_0_per_block`` is supplied
-            (schedule endpoints are then read from the supplied vector).
+        omega_0_min: Lower endpoint of the schedule.  Ignored if
+            ``omega_0_per_block`` is supplied (schedule endpoints are then
+            read from the supplied vector).
+        omega_0_max: Upper endpoint of the schedule; also sets the constant
+            runtime ``2π · omega_0_max`` factor that is pulled out of the
+            weight init.
         schedule: ``"linear"`` or ``"log"``.
         off_block_scale: Off-diagonal scaling for the hidden + output linear
             block masks.  ``0.0`` → strict block-diagonal; ``1.0`` →
@@ -2077,12 +2087,19 @@ class BlockDiagonalLearnableOmegaSIRENKernelND(LearnableOmegaSIRENKernelND):
         omega_0_per_block: Optional explicit ω₀ schedule of length
             ``num_blocks``.  Overrides ``omega_0_min``/``omega_0_max``/
             ``schedule`` when supplied.
-        omega_0_scale_min, omega_0_scale_max: Clamp bounds on the per-row
-            scale (default ``[1e-2, 2]``).  The strictly-positive floor
-            keeps every row's effective ω₀ above ``1e-2 · omega_0_max``
-            so no row's first-layer sine collapses to a constant.
-        apply_lr_scale: When True, attach ``_lr_scale = 1/(2π·omega_0_max)``
-            to the first-layer weight.  Default False.
+        omega_0_scale_min: Lower clamp on the per-row scale (default
+            ``1e-2``).  The strictly-positive floor keeps every row's
+            effective ω₀ above ``1e-2 · omega_0_max`` so no row's first-layer
+            sine collapses to a constant.
+        omega_0_scale_max: Upper clamp on the per-row scale (default ``2``).
+        apply_lr_scale: When ``True``, attach
+            ``_lr_scale = 1/(2π·omega_0_max)`` to the first-layer weight.
+            Default ``False``.
+
+    All other constructor arguments (``out_dim``, ``data_dim``,
+    ``mlp_hidden_dim``, ``num_layers``, ``embedding_dim``, ``L_cache``,
+    ``use_bias``, ``hidden_omega_0``, ``film_cfg``, ``film_after_pos_embed``)
+    have the same meaning as in :class:`SIRENKernelND`.
 
     Attributes:
         num_blocks (int): Number of frequency blocks.

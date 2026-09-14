@@ -1,4 +1,17 @@
-# TODO: Add license header here
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Distributed-training utility helpers for context-parallel (CP) workloads.
 
@@ -25,7 +38,6 @@ from datetime import timedelta
 
 import torch
 import torch.distributed as dist
-from megatron.core import parallel_state
 from torch.distributed.nn.functional import all_gather as functional_all_gather
 
 
@@ -58,6 +70,14 @@ def init_parallel_state(
         initializes the process group if not already initialized. It also verifies
         the context parallel rank and world size after initialization.
     """
+    try:
+        from megatron.core import parallel_state
+    except ImportError as exc:
+        raise ImportError(
+            "megatron-core is required for distributed / context-parallel training "
+            "(init_parallel_state). Install it with: pip install 'nvsubquadratic[distributed]'"
+        ) from exc
+
     num_gpus = torch.cuda.device_count()
     required_world_size = tensor_model_parallel_size * pipeline_model_parallel_size * context_parallel_size
     assert num_gpus == required_world_size, (

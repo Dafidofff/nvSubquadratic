@@ -1,5 +1,17 @@
-# TODO: Add license header here
-
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 r"""Continuous Kernel Convolution (CKConv) for N-dimensional signals.
 
@@ -108,7 +120,6 @@ References:
 import copy
 import inspect
 import math
-import warnings
 from collections.abc import Sequence
 from typing import Literal
 
@@ -126,16 +137,6 @@ from nvsubquadratic.ops.circular_fftconv import (
     circular_fftconv2d_fp32_bhl_w_reshape,
     circular_fftconv3d_fp32_bhl,
     circular_fftconv3d_fp32_bhl_w_reshape,
-)
-
-# FP16 circular FFT convolutions (requires power-of-2 spatial dimensions)
-from nvsubquadratic.ops.circular_fftconv_fp16 import (
-    circular_fftconv1d_fp16_bhl,
-    circular_fftconv1d_fp16_bhl_w_reshape,
-    circular_fftconv2d_fp16_bhl,
-    circular_fftconv2d_fp16_bhl_w_reshape,
-    circular_fftconv3d_fp16_bhl,
-    circular_fftconv3d_fp16_bhl_w_reshape,
 )
 from nvsubquadratic.ops.fftconv import (
     causal_fftconv1d_fp32_bhl,
@@ -173,26 +174,6 @@ from nvsubquadratic.ops.fftconv_chunked import (
 )
 from nvsubquadratic.ops.fftconv_chunked import (
     fftconv3d_fp32_bhl_w_reshape as fftconv3d_fp32_bhl_w_reshape_chunked,
-)
-
-# FP16 FFT convolutions (power-of-2 padding + ortho normalization)
-from nvsubquadratic.ops.fftconv_fp16 import (
-    causal_fftconv1d_fp16_bhl,
-    causal_fftconv1d_fp16_bhl_chunked,
-    causal_fftconv1d_fp16_bhl_w_reshape,
-    causal_fftconv1d_fp16_bhl_w_reshape_chunked,
-    fftconv1d_fp16_bhl,
-    fftconv1d_fp16_bhl_chunked,
-    fftconv1d_fp16_bhl_w_reshape,
-    fftconv1d_fp16_bhl_w_reshape_chunked,
-    fftconv2d_fp16_bhl,
-    fftconv2d_fp16_bhl_chunked,
-    fftconv2d_fp16_bhl_w_reshape,
-    fftconv2d_fp16_bhl_w_reshape_chunked,
-    fftconv3d_fp16_bhl,
-    fftconv3d_fp16_bhl_chunked,
-    fftconv3d_fp16_bhl_w_reshape,
-    fftconv3d_fp16_bhl_w_reshape_chunked,
 )
 
 # Mixed boundary-condition FFT convolutions (per-axis periodic / non-periodic).
@@ -250,39 +231,7 @@ FFT_FUNCTIONS_CHUNKED = {
     },
 }
 
-# FP16 versions (power-of-2 padding + ortho normalization to prevent overflow)
-# Note: circular fp16 requires power-of-2 spatial dimensions (cuFFT constraint).
-FFT_FUNCTIONS_FP16 = {
-    "circular": {
-        1: (circular_fftconv1d_fp16_bhl_w_reshape, circular_fftconv1d_fp16_bhl),
-        2: (circular_fftconv2d_fp16_bhl_w_reshape, circular_fftconv2d_fp16_bhl),
-        3: (circular_fftconv3d_fp16_bhl_w_reshape, circular_fftconv3d_fp16_bhl),
-    },
-    "zero": {
-        1: (fftconv1d_fp16_bhl_w_reshape, fftconv1d_fp16_bhl),
-        2: (fftconv2d_fp16_bhl_w_reshape, fftconv2d_fp16_bhl),
-        3: (fftconv3d_fp16_bhl_w_reshape, fftconv3d_fp16_bhl),
-    },
-    "causal": {
-        1: (causal_fftconv1d_fp16_bhl_w_reshape, causal_fftconv1d_fp16_bhl),
-        # Causal is only supported for 1D (sequences)
-    },
-}
-
-# FP16 + chunked: combines fp16 memory savings with channel-chunking savings
-FFT_FUNCTIONS_FP16_CHUNKED = {
-    "zero": {
-        1: (fftconv1d_fp16_bhl_w_reshape_chunked, fftconv1d_fp16_bhl_chunked),
-        2: (fftconv2d_fp16_bhl_w_reshape_chunked, fftconv2d_fp16_bhl_chunked),
-        3: (fftconv3d_fp16_bhl_w_reshape_chunked, fftconv3d_fp16_bhl_chunked),
-    },
-    "causal": {
-        1: (causal_fftconv1d_fp16_bhl_w_reshape_chunked, causal_fftconv1d_fp16_bhl_chunked),
-        # Causal is only supported for 1D (sequences)
-    },
-}
-
-# Mixed-BC FFT convolutions: only fp32 in v1 (see docs/ops/MIXED_BC_PLAN.md).
+# Mixed-BC FFT convolutions: fp32 (see docs/ops/mixed_boundary_conditions.md).
 # Each entry is ``(fn_for_BLH_input (bhl_w_reshape), fn_for_BHL_input)`` and
 # takes an additional ``periodic`` argument compared to the legacy ops; the
 # wrapper ``_wrap_mixed_op`` below adapts the call signature.
@@ -548,7 +497,6 @@ class CKConvND(torch.nn.Module):
             convolution.  Only valid when ``data_dim=1``.
         use_chunked_fftconv (bool): Whether to process channels in chunks to
             reduce peak GPU memory.
-        use_fp16_fft (bool): Whether to use fp16 FFT convolution ops.
         fft_backend (str): FFT backend identifier, ``"torch_fft"`` or
             ``"subq_ops"``.
         grid_type (str or None): Kernel grid size mode (``"single"``,
@@ -583,13 +531,12 @@ class CKConvND(torch.nn.Module):
         fft_padding: "Literal['zero', 'circular'] | str | Sequence[str]",
         is_causal: bool = False,
         use_chunked_fftconv: bool = False,
-        use_fp16_fft: bool = False,
         fft_backend: Literal["torch_fft", "subq_ops"] = "torch_fft",
     ):
         """Construct a CKConvND operator.
 
         Validates the combination of ``fft_padding``, ``grid_type``,
-        ``is_causal``, ``use_fp16_fft``, and ``fft_backend``, normalises the
+        ``is_causal``, and ``fft_backend``, normalises the
         per-axis boundary-condition representation, adjusts ``kernel_cfg``
         and ``mask_cfg`` to match the resolved kernel grid geometry, and
         selects the appropriate FFT convolution function pair.
@@ -635,7 +582,7 @@ class CKConvND(torch.nn.Module):
                 * ``["circular", "zero"]`` (list/tuple of mode strings, one
                   per spatial axis, length must equal ``data_dim``): per-axis
                   mixed boundary conditions.  Requires ``grid_type=None`` and
-                  ``fft_backend="torch_fft"`` and ``use_fp16_fft=False``.
+                  ``fft_backend="torch_fft"``.
                   Mode names are case-insensitive and whitespace-stripped.
 
                 Must be ``"zero"`` (or an all-``"zero"`` list) when
@@ -649,16 +596,6 @@ class CKConvND(torch.nn.Module):
                 reduce peak GPU memory from complex FFT intermediates.
                 Typical savings: ~26% memory at ~11% compute overhead.
                 Not supported with ``fft_padding="circular"``.
-                Default: ``False``.
-            use_fp16_fft: If ``True``, use fp16 FFT convolution ops.
-                Uses ``norm="ortho"`` internally to prevent overflow.  Saves
-                ~36% peak memory per convolution at ~0.8% mean relative error
-                vs fp32.  For zero/causal padding, spatial dims are
-                auto-padded to the next power of two.  For circular padding,
-                the input dims must already be powers of two (a runtime
-                assertion fires otherwise).  Not supported with a per-axis
-                ``fft_padding`` list (see ``docs/ops/MIXED_BC_PLAN.md``).
-                Not supported with ``fft_backend="subq_ops"``.
                 Default: ``False``.
             fft_backend: Which FFT convolution backend to use.
 
@@ -680,16 +617,13 @@ class CKConvND(torch.nn.Module):
         Raises:
             AssertionError: If ``fft_backend`` is not one of the recognised
                 values, or if a constraint between ``grid_type``,
-                ``fft_padding``, ``is_causal``, ``use_fp16_fft``, and
-                ``fft_backend`` is violated.
+                ``fft_padding``, ``is_causal``, and ``fft_backend`` is
+                violated.
             ValueError: If ``fft_padding`` is invalid (wrong type, wrong
                 length, comma-separated string, boolean), if ``is_causal``
                 is combined with a per-axis padding list or periodic padding,
                 or if the resolved ``(fft_padding, data_dim)`` combination
                 has no registered FFT function.
-            NotImplementedError: If ``use_fp16_fft=True`` is requested
-                together with a per-axis ``fft_padding`` list (fp16 mixed
-                ops are not yet implemented).
         """
         assert fft_backend in ["torch_fft", "subq_ops"], (
             f"Invalid fft_backend: {fft_backend!r}. Must be 'torch_fft' or 'subq_ops'."
@@ -763,22 +697,6 @@ class CKConvND(torch.nn.Module):
                 "Circular convolutions already have lower memory overhead due to no padding."
             )
 
-        # ---- fp16 + mixed-BC: not supported in v1 -----------------------------
-        if use_fp16_fft and _is_tuple_mode:
-            raise NotImplementedError(
-                "use_fp16_fft is not supported with a per-axis fft_padding in v1. "
-                "Either drop the fp16 flag or use a uniform 'zero'/'circular' fft_padding. "
-                "See docs/ops/MIXED_BC_PLAN.md (§4.2) for the planned fp16 mixed op."
-            )
-
-        if use_fp16_fft and not _is_tuple_mode and fft_padding == "circular":
-            warnings.warn(
-                "use_fp16_fft with circular padding requires power-of-2 spatial "
-                "dimensions (cuFFT fp16 constraint). A runtime assertion will fire "
-                "if the input is not power-of-2.",
-                stacklevel=2,
-            )
-
         # subq_ops backend constraints
         if fft_backend == "subq_ops":
             if _is_tuple_mode:
@@ -804,18 +722,12 @@ class CKConvND(torch.nn.Module):
                 raise AssertionError(
                     f"fft_backend='subq_ops' only supports data_dim in (1, 2). Got data_dim={data_dim}."
                 )
-            assert not use_fp16_fft, (
-                "fft_backend='subq_ops' does not support fp16 FFT — the CUDA kernel "
-                "manages its own precision internally. Use use_fp16_fft=False."
-            )
-
         super().__init__()
         self.data_dim = data_dim
         self.hidden_dim = hidden_dim
         self.fft_padding = fft_padding
         self.is_causal = is_causal
         self.use_chunked_fftconv = use_chunked_fftconv
-        self.use_fp16_fft = use_fp16_fft
         self.fft_backend = fft_backend
         # Per-axis BC: single source of truth used by forward() and flop_count().
         # Always present (length == data_dim), even in legacy single-mode form.
@@ -948,15 +860,7 @@ class CKConvND(torch.nn.Module):
             else:
                 effective_padding = "zero"
 
-            # Choose FFT functions: fp16+chunked > fp16 > chunked > standard
-            if use_fp16_fft and use_chunked_fftconv:
-                fft_fn_table = FFT_FUNCTIONS_FP16_CHUNKED
-            elif use_fp16_fft:
-                fft_fn_table = FFT_FUNCTIONS_FP16
-            elif use_chunked_fftconv:
-                fft_fn_table = FFT_FUNCTIONS_CHUNKED
-            else:
-                fft_fn_table = FFT_FUNCTIONS
+            fft_fn_table = FFT_FUNCTIONS_CHUNKED if use_chunked_fftconv else FFT_FUNCTIONS
             try:
                 self.fftconv_fn, self.fftconv_fn_bhl_input = fft_fn_table[effective_padding][self.data_dim]
             except KeyError:
@@ -979,7 +883,7 @@ class CKConvND(torch.nn.Module):
             ``data_dim``, ``hidden_dim``, ``fft_padding``,
             ``periodic_per_axis`` (only when in per-axis list mode),
             ``grid_type``, ``is_causal``, ``use_chunked_fftconv``,
-            ``use_fp16_fft``, and ``fft_backend``.
+            and ``fft_backend``.
         """
         bc_repr = f"fft_padding={self.fft_padding!r}"
         if self._is_tuple_mode:
@@ -987,51 +891,50 @@ class CKConvND(torch.nn.Module):
         return (
             f"data_dim={self.data_dim}, hidden_dim={self.hidden_dim}, "
             f"{bc_repr}, grid_type={self.grid_type!r}, is_causal={self.is_causal}, "
-            f"use_chunked_fftconv={self.use_chunked_fftconv}, use_fp16_fft={self.use_fp16_fft}, "
+            f"use_chunked_fftconv={self.use_chunked_fftconv}, "
             f"fft_backend={self.fft_backend!r}"
         )
 
     def flop_count(self, spatial_dims: tuple[int, ...], inference: bool = False) -> int:
         """Count FLOPs for CKConv: kernel generation + FFT convolution.
 
-        Two phases:
+        Two phases.
 
-        Phase 1 - Kernel generation (via SIREN MLP):
-            Delegated to ``self.kernel.flop_count(grid_lens, inference)``.
-            At ``inference=True`` without FiLM, the kernel is input-independent
-            and can be precomputed, so this returns 0.
+        **Phase 1 — kernel generation (via SIREN MLP).**  Delegated to
+        ``self.kernel.flop_count(grid_lens, inference)``.  At
+        ``inference=True`` without FiLM, the kernel is input-independent and
+        can be precomputed, so this phase returns 0.
 
-        Phase 2 - FFT-based depthwise convolution (C = ``self.hidden_dim``):
-          The convolution is computed in the frequency domain.  Padded signal
-          sizes Np_i depend on the padding mode:
-            - ``"zero"`` non-causal ("same"-mode):
-                Np_i = min(s_i + (k_i + 1) // 2,  2 * s_i)
-              Only half the kernel width of extra padding is needed beyond
-              the input size, because the output is cropped back to input
-              size (centered crop).  Matches ``fftconv.py`` line 624-628.
-            - ``"zero"`` causal (1D only):
-                Np_i = min(s_i + k_i,  2 * s_i)
-              Full linear convolution length; output is tail-cropped.
-            - ``"circular"``: Np_i = s_i  (wrap-around, no extra padding)
+        **Phase 2 — FFT-based depthwise convolution** with ``C =
+        self.hidden_dim``.  The convolution runs in the frequency domain.
+        Padded signal sizes ``Np_i`` depend on the padding mode:
 
-          A separable N-D FFT on a grid of size (Np_1, ..., Np_d) costs:
-            5 * prod(Np) * sum(log2(Np_i))  real FLOPs per channel,
-          based on the radix-2 Cooley-Tukey decomposition where each butterfly
-          operation costs ~5 real FLOPs (1 complex multiply ≈ 4 real muls +
-          2 real adds, minus shared twiddle-factor optimizations → ~5 ops).
-          Note: the implementation uses ``rfft`` (real-to-complex), which is
-          ~2x cheaper than a full complex FFT; the 5N log N formula is a
-          conservative (upper-bound) estimate consistent with standard
-          vision-paper conventions.
+        - ``"zero"`` non-causal ("same" mode):
+          ``Np_i = min(s_i + (k_i + 1) // 2, 2 * s_i)``.  Only half the
+          kernel width of extra padding is needed because the output is
+          centre-cropped back to the input size.  Matches ``fftconv.py``
+          lines 624-628.
+        - ``"zero"`` causal (1D only): ``Np_i = min(s_i + k_i, 2 * s_i)``.
+          Full linear convolution length; the output is tail-cropped.
+        - ``"circular"``: ``Np_i = s_i``.  Wrap-around, no extra padding.
 
-          Three FFTs are needed: forward FFT of input, forward FFT of kernel,
-          and inverse FFT of the product.  At ``inference=True`` without FiLM,
-          the kernel FFT is precomputed and cached, reducing to 2 FFTs.
+        A separable N-D FFT on a grid of size ``(Np_1, ..., Np_d)`` costs
+        ``5 * prod(Np) * sum(log2(Np_i))`` real FLOPs per channel, from the
+        radix-2 Cooley-Tukey decomposition (each butterfly ≈ 5 real FLOPs:
+        1 complex multiply = 4 real muls + 2 real adds, minus shared
+        twiddle-factor optimisations).  The implementation uses ``rfft``
+        (real-to-complex), which is ~2x cheaper than a full complex FFT;
+        the ``5N log N`` formula is a conservative upper bound consistent
+        with vision-paper conventions.
 
-          Pointwise complex multiply in the frequency domain:
-            6 * C * prod(Np)  (4 real muls + 2 real adds for (a+bi)(c+di)).
+        Three FFTs are needed (forward of input, forward of kernel, inverse
+        of the product).  At ``inference=True`` without FiLM the kernel FFT
+        is precomputed and cached, reducing to two FFTs.
 
-          Shortcut (skip connection): C * prod(spatial_dims)  (elementwise).
+        Pointwise complex multiply in the frequency domain costs
+        ``6 * C * prod(Np)`` (4 real muls + 2 real adds for ``(a + bi)(c + di)``).
+        The shortcut (skip connection) costs ``C * prod(spatial_dims)``
+        elementwise multiplies.
 
         Args:
             spatial_dims: Spatial dimensions of the input signal, e.g.

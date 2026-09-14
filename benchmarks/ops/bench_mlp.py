@@ -1,7 +1,32 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Focused GPU correctness + benchmark for MLP: torch vs QuACK.
 
-Matches the well/euler training config:
-  dim=384, activation="glu", batch_size=24, seq_len=1024, bf16
+Matches the well/euler training config (``dim=384``,
+``activation="glu"``, ``batch_size=24``, ``seq_len=1024``, BF16) so the
+relative numbers are representative of the real training workload.
+
+Targets: Hopper or Blackwell GPUs (H100, B200) — the QuACK fused path
+needs them; on Ampere this script falls back to the pure-PyTorch MLP
+and only the timing of that one variant is meaningful.
+
+Usage:
+    PYTHONPATH=. conda run -n nv-subq python benchmarks/ops/bench_mlp.py
+
+Output: stdout summary table comparing the torch and QuACK backends.
 """
 
 import time

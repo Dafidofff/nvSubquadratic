@@ -1,8 +1,35 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Quick correctness and forward-speed check for the CUDA fft_causal_conv1d kernel.
 
-Example:
-    PYTHONPATH=. python scripts/bench_subquadratic_fftconv.py --device cuda
+Compares ``subquadratic_ops_torch.fft_causal_conv1d`` against the
+reference ``torch.fft``-based implementation across a few realistic
+1D Hyena workloads, then prints absolute / relative errors and forward
+throughput.  Intended as a fast sanity gate after kernel changes.
+
+Targets: any Ampere+ GPU with the ``subquadratic_ops_torch`` wheel
+installed (requires CUDA toolkit 12).
+
+Usage:
+    PYTHONPATH=. conda run -n nv-subq python \\
+        benchmarks/ops/bench_subquadratic_fftconv.py --device cuda
+
+Output: stdout (correctness summary + throughput table).
 """
 
 from __future__ import annotations

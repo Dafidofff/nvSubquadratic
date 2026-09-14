@@ -1,6 +1,17 @@
-# TODO: Add license header here
-
-# Adapted from https://github.com/implicit-long-convs/ccnn_v2
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """General-purpose residual network backbone.
 
@@ -44,8 +55,6 @@ inside a larger context window.  A ``target_size`` element of ``1`` collapses
 
 Set ``gradient_checkpointing=True`` to recompute activations during the backward
 pass instead of storing them, trading compute for memory at large scale.
-
-Adapted from https://github.com/implicit-long-convs/ccnn_v2.
 """
 
 from typing import Sequence

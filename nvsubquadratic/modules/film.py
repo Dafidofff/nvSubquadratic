@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """FiLM (Feature-wise Linear Modulation) components for kernel conditioning.
 
 **What is FiLM?**
@@ -195,19 +210,19 @@ class KernelFiLMGenerator(nn.Module):
     def flop_count(self) -> int:
         """Count FLOPs for the FiLM generator MLP (one sample).
 
-        The MLP maps a single conditioning vector [cond_dim] to FiLM
-        parameters [num_film_layers * 2 * kernel_hidden_dim]:
-
-          Linear(cond_dim, film_hidden_dim)  ->  GELU  ->  Linear(film_hidden_dim, out_dim)
+        The MLP maps a single conditioning vector ``[cond_dim]`` to FiLM
+        parameters ``[num_film_layers * 2 * kernel_hidden_dim]`` via
+        ``Linear(cond_dim, film_hidden_dim) -> GELU -> Linear(film_hidden_dim, out_dim)``.
 
         FLOPs breakdown:
-          1. First Linear:    2 * cond_dim * film_hidden_dim
-             (cond_dim = ``self.mlp[0].in_features``,
-              film_hidden_dim = ``self.mlp[0].out_features``)
-          2. GELU activation:  film_hidden_dim  (elementwise)
-          3. Second Linear:   2 * film_hidden_dim * out_dim
-             (out_dim = num_film_layers * 2 * kernel_hidden_dim
-              = ``self.mlp[2].out_features``)
+
+        - First linear: ``2 * cond_dim * film_hidden_dim`` (with
+          ``cond_dim = self.mlp[0].in_features`` and
+          ``film_hidden_dim = self.mlp[0].out_features``).
+        - GELU activation: ``film_hidden_dim`` (elementwise).
+        - Second linear: ``2 * film_hidden_dim * out_dim``, with
+          ``out_dim = num_film_layers * 2 * kernel_hidden_dim =
+          self.mlp[2].out_features``.
 
         This runs once per sample per CKConvND layer that uses FiLM.
 

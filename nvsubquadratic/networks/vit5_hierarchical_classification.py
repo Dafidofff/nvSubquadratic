@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# David W. Romero, 2025-09-09
+
 """Hierarchical ViT-5 classification network (Swin-style stages + patch merging).
 
 Differs from ``ViT5ClassificationNet`` in three ways:
@@ -186,6 +203,12 @@ class ViT5HierarchicalClassificationNet(nn.Module):
           5. Final norm on 1 GAP'd token: out_norm.flop_count(1).
           6. GAP itself: num_patches_last * stage_dims[-1] adds.
           7. Head: 2 * stage_dims[-1] * num_classes.
+
+        Args:
+            inference: Forwarded to each block's FLOP estimator.
+
+        Returns:
+            int: Approximate arithmetic FLOPs for one image.
         """
         D0 = self.stage_dims[0]
         P = self.initial_patch_size

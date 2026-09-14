@@ -1,5 +1,17 @@
-# TODO: Add license header here
-
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 r"""FFT-based convolution operators (fp32) for 1D, 2D, and 3D signals.
 
@@ -80,18 +92,14 @@ Optional ``shortcut: [H]`` adds a per-channel residual scale of the input:
     y \leftarrow y + \text{shortcut} \odot x
 
 broadcast along the spatial dimensions. This fuses the residual into the same
-kernel launch and matches the algebra used by the multi-head FFT conv (see
-:mod:`nvsubquadratic.ops.fftconv_multihead`) and by Hyena gating.
+kernel launch and matches the algebra used by Hyena gating.
 
 Precision
 ---------
 All operators accept any input dtype. Internally ``x`` and ``kernel`` are
 cast to ``float32`` for numerical stability (the frequency-domain product
 amplifies the dynamic range of intermediate values); the output is returned
-in the original dtype of ``x``. For aggressive memory/compute savings on
-power-of-two spatial dims, see the fp16 counterparts in
-:mod:`nvsubquadratic.ops.fftconv_fp16` and
-:mod:`nvsubquadratic.ops.circular_fftconv_fp16`.
+in the original dtype of ``x``.
 
 Performance
 -----------

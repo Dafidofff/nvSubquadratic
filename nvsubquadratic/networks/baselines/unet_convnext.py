@@ -1,3 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024 Polymathic AI.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Portions ported from PolymathicAI/the_well (BSD-3-Clause), itself adapted from
+# facebookresearch/ConvNeXt (MIT; Copyright (c) Meta Platforms, Inc. and affiliates).
+# See THIRD_PARTY_NOTICES.txt for the full BSD-3-Clause and MIT license texts.
+
 """UNet-ConvNeXt baseline from The Well benchmark.
 
 Mixed adaptation from:
@@ -29,8 +49,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from timm.layers import DropPath
 from torch.utils.checkpoint import checkpoint
+
+
+# timm is an optional dependency — only the stochastic-depth DropPath in these
+# ConvNeXt baselines uses it. Import lazily so the module (and the rest of
+# networks.baselines) loads without timm installed; a clear error is raised only
+# if a model is actually built with drop_path > 0. Install: nvsubquadratic[baselines].
+try:
+    from timm.layers import DropPath
+except ImportError:  # pragma: no cover - exercised only when timm is absent
+    DropPath = None
 
 
 conv_modules = {1: nn.Conv1d, 2: nn.Conv2d, 3: nn.Conv3d}
@@ -128,7 +157,15 @@ class _Block(nn.Module):
             if layer_scale_init_value > 0
             else None
         )
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        if drop_path > 0.0:
+            if DropPath is None:
+                raise ImportError(
+                    "timm is required for stochastic depth (drop_path > 0) in the ConvNeXt "
+                    "baselines. Install it with: pip install 'nvsubquadratic[baselines]'"
+                )
+            self.drop_path = DropPath(drop_path)
+        else:
+            self.drop_path = nn.Identity()
 
     def forward(self, x):
         input = x
@@ -268,10 +305,10 @@ class UNetConvNext(nn.Module):
         """Forward pass.
 
         Args:
-            x: Channels-first input tensor [B, C_in, *spatial].
+            x: Channels-first input tensor ``[B, C_in, *spatial]``.
 
         Returns:
-            Channels-first output tensor [B, C_out, *spatial].
+            Channels-first output tensor ``[B, C_out, *spatial]``.
 
         Note:
             **Known bug (upstream):** ``skips[0]`` (finest-resolution encoder

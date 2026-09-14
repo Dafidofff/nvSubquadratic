@@ -1,4 +1,34 @@
-"""Profile + test optimizations for ViT-5-Small."""
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Probe ``torch.compile`` configurations on top of ViT-5-Small.
+
+Sweeps eager / ``torch.compile`` (default) / ``max-autotune`` plus
+selective per-component compilation, all on the baseline ViT-5-Small
+chassis.  Identifies which compile recipe produces the best speedup
+for this model before any dataloader / dtype optimisations are layered
+on.
+
+Targets: H100 SXM 80GB, BF16, batch size 256.
+
+Usage:
+    PYTHONPATH=. conda run -n nv-subq python \\
+        benchmarks/vit5_imagenet/bench_vit5_compile.py
+
+Output: stdout summary table.
+"""
 
 import sys
 import time

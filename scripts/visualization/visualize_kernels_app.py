@@ -1,13 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Interactive Kernel + Mask Visualizer (Gradio).
 
-Loads ``.npz`` files produced by ``extract_kernel_data.py`` and provides
-interactive side-by-side exploration of learned SIREN kernels, Gaussian masks,
-and masked kernels across runs and blocks.
+Loads ``.npz`` files produced by ``scripts/data/extract_kernel_data.py`` and
+provides interactive side-by-side exploration of learned SIREN kernels,
+Gaussian masks, and masked kernels across runs and blocks.
 
 All sampled channels are shown at once in a grid — only the block needs switching.
 
 Usage:
-    conda run -n nv-subq python scripts/visualize_kernels_app.py --data-dir tmp/kernel_data
+    conda run -n nv-subq python scripts/visualization/visualize_kernels_app.py --data-dir tmp/kernel_data
 """
 
 from __future__ import annotations

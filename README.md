@@ -16,9 +16,9 @@ nvSubquadratic consolidates efforts from across NVIDIA Research teams (nvResearc
 
 **Requirements**:
 
-- CUDA-compatible NVIDIA GPU (Ampere or Hopper architecture)
+- CUDA-compatible NVIDIA GPU (Ampere or newer)
 - CUDA Toolkit 12.0 or higher
-- Python 3.11 or higher
+- Python 3.10 or higher
 
 **quack-kernels (optional)**:
 
@@ -37,6 +37,32 @@ nvSubquadratic provides a **high-level PyTorch interface** that depends on the *
 
 ## Installation
 
+### PyPI
+
+```bash
+pip install nvsubquadratic
+```
+
+This installs the full training/experiment stack — nvSubquadratic targets GPU
+workflows. Requires Python 3.10+.
+
+Optional extras:
+
+```bash
+pip install "nvsubquadratic[cuda]"         # accelerated fused FFT-conv / causal-conv CUDA kernels
+pip install "nvsubquadratic[quack]"        # fused RMSNorm kernel (Hopper/Blackwell only)
+pip install "nvsubquadratic[dali]"         # NVIDIA DALI data pipelines for the ImageNet/Well examples (~400 MB)
+pip install "nvsubquadratic[distributed]"  # megatron-core, for context-parallel / distributed training
+pip install "nvsubquadratic[baselines]"    # timm, for the ConvNeXt UNet baseline models
+pip install "nvsubquadratic[all]"          # all of the above
+```
+
+The accelerated CUDA kernels (`[cuda]`) are a source build that requires `nvcc`,
+so they are kept out of the core install — this is what lets `pip install nvsubquadratic` succeed in environments without the CUDA toolkit (e.g. a
+downstream project's CPU CI). The operators default to the portable `torch.fft`
+backend; selecting `fft_backend="subq_ops"` without `[cuda]` installed raises a
+clear `ImportError` pointing you to the extra.
+
 ### Package Manager
 
 This project uses **pip** with `pyproject.toml` for dependency management. A `Pipfile.lock` is maintained for nSpect security scanning compliance.
@@ -50,7 +76,7 @@ Open in VS Code and select "Reopen in Container". The devcontainer extension wil
 ```bash
 # Build and run
 docker build -t nvsubquadratic:dev .
-docker run --gpus all -p 8888:8888 -v $(pwd):/workspaces/nvSubquadratic-private nvsubquadratic:dev
+docker run --gpus all -p 8888:8888 -v $(pwd):/workspaces/nvSubquadratic nvsubquadratic:dev
 ```
 
 The Dockerfile builds NVIDIA Apex from source for a broad set of NVIDIA archs by default (`7.0;7.5;8.0;8.6;8.9;9.0;10.0;12.0` — Volta through Blackwell). Two build-args let you tune the compile:
@@ -66,14 +92,14 @@ docker build \
 
 ### Enroot (SLURM clusters)
 
-For SLURM deployments that use enroot/pyxis, [`slurm/enroot/build_sqsh.sh`](slurm/enroot/build_sqsh.sh) builds the Docker image and converts it to an enroot `.sqsh` in one step. It selects the right `TORCH_CUDA_ARCH_LIST` and `MAX_JOBS` per platform:
+For SLURM deployments that use enroot/pyxis, [`scripts/slurm/enroot/build_sqsh.sh`](scripts/slurm/enroot/build_sqsh.sh) builds the Docker image and converts it to an enroot `.sqsh` in one step. It selects the right `TORCH_CUDA_ARCH_LIST` and `MAX_JOBS` per platform:
 
 ```bash
 # H100 (x86-64, default)
-slurm/enroot/build_sqsh.sh
+scripts/slurm/enroot/build_sqsh.sh
 
 # GB200 (ARM64) — uses qemu emulation on an x86 build host
-PLATFORM=arm64 slurm/enroot/build_sqsh.sh
+PLATFORM=arm64 scripts/slurm/enroot/build_sqsh.sh
 ```
 
 ### Apptainer
@@ -83,13 +109,13 @@ PLATFORM=arm64 slurm/enroot/build_sqsh.sh
 apptainer build nvsubquadratic.sif nvsubquadratic.def
 
 # Interactive shell with GPUs and live code from your checkout
-apptainer shell --nv --bind $(pwd):/workspaces/nvSubquadratic-private nvsubquadratic.sif
+apptainer shell --nv --bind $(pwd):/workspaces/nvSubquadratic nvsubquadratic.sif
 
 # Run a command inside the image (example: tests)
-apptainer exec --nv --bind $(pwd):/workspaces/nvSubquadratic-private nvsubquadratic.sif python -m pytest nvsubquadratic/ tests/
+apptainer exec --nv --bind $(pwd):/workspaces/nvSubquadratic nvsubquadratic.sif python -m pytest nvsubquadratic/ tests/
 
 # Use the default runscript (starts Jupyter Lab as defined in the .def)
-apptainer run --nv --bind $(pwd):/workspaces/nvSubquadratic-private nvsubquadratic.sif --no-browser
+apptainer run --nv --bind $(pwd):/workspaces/nvSubquadratic nvsubquadratic.sif --no-browser
 ```
 
 ### Conda (recommended for local development)
@@ -161,8 +187,6 @@ for the style guide and PR checklist.
 
 #### Viewing the docs
 
-**Sphinx HTML (full API reference)**
-
 The API reference is built with Sphinx. Sources live under [`docs/`](docs/) and
 the rendered site is published to the `gh-pages` branch on every push to `main`
 via [`.github/workflows/docs.yml`](.github/workflows/docs.yml).
@@ -176,38 +200,16 @@ make -C docs html SPHINXBUILD="python -m sphinx"
 python -m http.server 8000 --directory docs/_build/html
 ```
 
-Open <http://localhost:8000> to browse.  The autosummary stubs in
-`docs/generated/` are regenerated on every build (gitignored).
+Open <http://localhost:8000> to browse.  The autosummary stubs under
+`docs/api/generated/` are regenerated on every build (gitignored).
 
-**Inline — IDE hover / `help()`**
-
-Because all documentation lives directly in the docstrings, you can also:
-
-- Hover over any symbol in VS Code / PyCharm to see the rendered docstring.
-- Run `help(SomeClass)` in a Python REPL for an immediate plain-text view.
-- Use `python -m pydoc nvsubquadratic.modules.hyena_nd` for a terminal-friendly
-  per-module dump.
-
-**`pdoc` (quick zero-config HTML)**
-
-For a fast, dependency-light alternative to Sphinx that renders the docstrings
-as-is:
-
-```bash
-pip install pdoc
-pdoc nvsubquadratic --output-dir /tmp/pdoc-out
-python -m http.server 8000 --directory /tmp/pdoc-out
-```
-
-This does not require a `docs/conf.py` and picks up the Google-style sections
-automatically.
+While editing, you can also hover over any symbol in VS Code / PyCharm to
+see the rendered docstring, or run `help(SomeClass)` in a REPL.
 
 ### CI
 
-GPU tests run automatically on pull requests via a self-hosted [Colossus](https://colossus.nvidia.com) runner.
-The runner is provisioned using the Ansible playbook at
-[gitlab-master.nvidia.com/farhadr/colossus-ansible-playbook](https://gitlab-master.nvidia.com/farhadr/colossus-ansible-playbook)
-— see that repo for setup instructions.
+GPU tests run automatically on pull requests via a self-hosted runner.
+Runner provisioning is maintained out-of-tree; contact the maintainers for access.
 
 ### Pre-commit Hooks
 
@@ -218,3 +220,16 @@ The runner is provisioned using the Ansible playbook at
 - YAML validation
 - Markdown formatting
 - Secret detection
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+DCO sign-off requirement and the PR/issue flow.  Pull requests from
+external forks run through the same CI pipeline; the GPU stage requires a
+codeowner ([.github/CODEOWNERS](.github/CODEOWNERS)) to approve workflow
+runs from outside collaborators before the self-hosted runner picks them
+up — this is the standard GitHub "Require approval for outside
+collaborators" gate.
+
+For security-sensitive findings, please follow [SECURITY.md](SECURITY.md)
+instead of opening a public issue or PR.

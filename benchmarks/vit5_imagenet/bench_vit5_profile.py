@@ -1,4 +1,33 @@
-"""Profile one fwd+bwd step of ViT-5-Small to find time breakdown."""
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Per-phase profiling of a single ViT-5-Small forward+backward step.
+
+Instruments forward, attention/mixer, MLP, backward, and optimizer
+phases with CUDA-synced timers and reports their share of the step.
+Use this to diagnose a regression: if total step time goes up, this
+script shows which phase moved.
+
+Targets: H100 SXM 80GB, BF16, batch size 256.
+
+Usage:
+    PYTHONPATH=. conda run -n nv-subq python \\
+        benchmarks/vit5_imagenet/bench_vit5_profile.py
+
+Output: stdout phase-breakdown table.
+"""
 
 import sys
 

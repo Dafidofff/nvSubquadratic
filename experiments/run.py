@@ -1,6 +1,17 @@
-# TODO: Add license header here
-
-# Adapted from https://github.com/implicit-long-convs/ccnn_v2
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 r"""Main entry point for launching nvSubquadratic training runs.
 
@@ -32,8 +43,6 @@ Command-line interface:
 6. Instantiates the Lightning wrapper from ``cfg.lightning_wrapper_cfg``.
 7. Calls :func:`~experiments.trainer.construct_trainer` and
    :meth:`pytorch_lightning.Trainer.fit`.
-
-Adapted from https://github.com/implicit-long-convs/ccnn_v2.
 """
 
 import argparse
@@ -92,7 +101,7 @@ def parse_args() -> argparse.Namespace:
         "--config",
         type=str,
         required=True,
-        help="Path to the configuration file, e.g., config/experiments/mnist/mnist_classification_cfg.py",
+        help="Path to the configuration file, e.g., examples/imagenet_classification/ccnn_7_512_hyena.py",
     )
 
     # Add a catch-all for arbitrary config overrides

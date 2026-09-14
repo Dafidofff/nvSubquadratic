@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # David W. Romero, 2025-01-19
 
 """Lightning wrapper for autoregressive (next-token prediction) tasks.
@@ -26,13 +41,15 @@ from experiments.lightning_wrappers.base_lightning_wrapper import LightningWrapp
 class AutoregressiveWrapper(LightningWrapperBase):
     """Lightning wrapper for autoregressive (next-token prediction) tasks.
 
-    .. todo:: Resume support (see ClassificationWrapper for reference)
-        - Add ``on_save_checkpoint`` / ``on_load_checkpoint`` to persist
-          ``best_train_loss`` and ``best_val_loss`` across job resumes.
-          Without this, best-metric tracking silently resets to ``inf``
-          after every SLURM preemption or manual resume.
-        - Add corresponding tests in ``tests/test_checkpoint_resume.py``
-          (see ``TestBestMetricsPersistence`` for the classification pattern).
+    .. todo::
+
+       Resume support (see :class:`ClassificationWrapper` for the reference
+       pattern).  Add ``on_save_checkpoint`` / ``on_load_checkpoint`` hooks
+       that persist ``best_train_loss`` and ``best_val_loss`` across job
+       resumes — without them, best-metric tracking silently resets to
+       ``inf`` after every SLURM preemption or manual resume.  Add
+       corresponding tests in ``tests/test_checkpoint_resume.py`` (see
+       ``TestBestMetricsPersistence`` for the classification pattern).
 
     Args:
         network: Network to wrap. Should output logits of shape [B, L, vocab_size] for

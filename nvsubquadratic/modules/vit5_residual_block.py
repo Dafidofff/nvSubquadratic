@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """ViT-5 Residual Block: Pre-norm + Sequence Mixer/MLP with LayerScale and DropPath.
 
 This module provides the specialised residual block used throughout the ViT-5
@@ -299,14 +314,14 @@ class ViT5ResidualBlock(nn.Module):
         modulation (e.g. scaling SIREN kernel features).
 
         Args:
-            x: Input token sequence of shape ``[B, T, C]``, where:
-                - ``B`` — batch size,
-                - ``T = num_patches + (1 if has_cls else 0) + num_registers
-                  (+ pad_size for Hyena blocks)`` — total token count following
-                  the ViT-5 layout ``[patches, (CLS,) registers, (padding,)]``.
-                  Attention blocks receive the unpadded sequence; Hyena blocks
-                  receive the zero-padded sequence so ``T % grid_w == 0``,
-                - ``C`` — channel (hidden) dimension.
+            x: Input token sequence of shape ``[B, T, C]``.  ``B`` is the
+                batch size and ``C`` is the channel (hidden) dimension.
+                ``T = num_patches + (1 if has_cls else 0) + num_registers
+                (+ pad_size for Hyena blocks)`` is the total token count
+                following the ViT-5 layout
+                ``[patches, (CLS,) registers, (padding,)]``.  Attention
+                blocks receive the unpadded sequence; Hyena blocks receive
+                the zero-padded sequence so ``T % grid_w == 0``.
             condition: Accepted for API compatibility with
                 :class:`~nvsubquadratic.modules.residual_block.ResidualBlock`
                 but **always ignored** in this class.  ViT-5 conditioning is

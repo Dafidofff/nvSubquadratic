@@ -1,7 +1,33 @@
-"""Verify VRMSE computation by comparing our pipeline vs manual computation.
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Cross-check the VRMSE metric implementation against manual computation.
 
 Loads a checkpoint, runs inference on test data, and computes VRMSE
-using multiple independent methods to check for discrepancies.
+via multiple independent paths (Lightning callback, manual numpy,
+per-channel reduction) to detect implementation drift.  Run after any
+change to the WELL regression wrapper or its loss / metric code.
+
+Targets: H100 SXM 80GB (or any Ampere+ GPU); needs the matching WELL
+dataset on disk.
+
+Usage:
+    PYTHONPATH=. conda run -n nv-subq python \\
+        benchmarks/well/verify_vrmse.py --checkpoint <path>
+
+Output: stdout (per-method VRMSE values + per-channel diffs).
 """
 
 import argparse

@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# David W. Romero, 2025-09-09
+
 """Tests for the PatchMerging module."""
 
 import pytest
@@ -145,3 +162,49 @@ def test_flop_count_pure(device) -> None:
     reduction_flops = 2 * T_out * 4 * in_dim * out_dim
     assert f > reduction_flops  # norm contributes a (small) positive amount
     assert isinstance(f, int)
+
+
+@pytest.mark.parametrize("num_regs", [1, 2])
+def test_register_padding_preserves_cpu_autocast_dtype(num_regs):
+    pm = PatchMerging(
+        4, 8, 4, 4, LazyConfig(RMSNorm)(dim=16, use_quack=False), num_registers=num_regs, has_register_row=True
+    )
+    x = torch.randn(2, 20, 4, requires_grad=True)
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        y = pm(x)
+    assert y.dtype == torch.bfloat16
+    assert torch.count_nonzero(y[:, num_regs:2]) == 0
+    y.float().square().sum().backward()
+    assert torch.isfinite(x.grad).all()
+    assert pm.reg_proj.weight.grad.abs().sum() > 0
+
+
+def test_grid_and_token_apis_have_identical_outputs_and_gradients():
+    from nvsubquadratic.modules.patch_merging import PatchMerging2D
+
+    grid = PatchMerging2D(4).double()
+    token = PatchMerging(4, 8, 6, 8, LazyConfig(torch.nn.LayerNorm)(normalized_shape=16)).double()
+    token.load_state_dict(grid.state_dict(), strict=True)
+    x = torch.randn(2, 6, 8, 4, dtype=torch.float64, requires_grad=True)
+    flat = x.detach().flatten(1, 2).requires_grad_(True)
+    y_grid, y_token = grid(x), token(flat)
+    torch.testing.assert_close(y_grid.flatten(1, 2), y_token)
+    y_grid.square().sum().backward()
+    y_token.square().sum().backward()
+    torch.testing.assert_close(x.grad.flatten(1, 2), flat.grad)
+    torch.testing.assert_close(grid.reduction.weight.grad, token.reduction.weight.grad)
+    assert grid.flop_count(6, 8) == token.flop_count()
+
+
+@pytest.mark.parametrize("kwargs", [{"grid_h": 0}, {"in_dim": 0}, {"num_registers": -1}, {"num_registers": 1}])
+def test_invalid_dimensions_and_register_modes(kwargs):
+    options = {
+        "in_dim": 4,
+        "out_dim": 8,
+        "grid_h": 4,
+        "grid_w": 4,
+        "norm_cfg": LazyConfig(RMSNorm)(dim=16, use_quack=False),
+    }
+    options.update(kwargs)
+    with pytest.raises(ValueError):
+        PatchMerging(**options)

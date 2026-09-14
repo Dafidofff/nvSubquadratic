@@ -1,5 +1,20 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 # Configuration file for the Sphinx documentation builder.
 # See https://www.sphinx-doc.org/en/master/usage/configuration.html
@@ -21,11 +36,8 @@ project = "nvsubquadratic"
 
 
 def _read_version():
-    init_path = os.path.join(os.path.dirname(__file__), "..", "nvsubquadratic", "__init__.py")
-    for line in open(init_path):
-        if line.startswith("__version__"):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "0.0.0"
+    version_path = os.path.join(os.path.dirname(__file__), "..", "VERSION")
+    return open(version_path).read().strip()
 
 
 version = _read_version()
@@ -42,9 +54,14 @@ extensions = [
     "sphinx.ext.extlinks",
     "sphinx.ext.githubpages",
     "sphinx.ext.doctest",
+    "sphinx.ext.todo",
     "sphinx_copybutton",
     "sphinx.ext.mathjax",
 ]
+
+# Show `.. todo::` blocks (used in a few docstrings) instead of silently
+# dropping them at build time.
+todo_include_todos = True
 
 templates_path = ["_templates"]
 
@@ -60,6 +77,7 @@ autodoc_default_options = {
 }
 
 autodoc_mock_imports = [
+    # CUDA / GPU-only deps — never installable on the docs runner.
     "subquadratic_ops_torch",
     "subquadratic_ops_torch._ext",
     "quack",
@@ -67,11 +85,30 @@ autodoc_mock_imports = [
     "apex",
     "flash_attn",
     "dali",
+    "nvidia",
     "nvidia.dali",
+    # Pure-Python deps that the doc runner skips to keep the install lean.
     "einops",
     "megatron",
     "megatron.core",
     "omegaconf",
+    "cleanfid",
+    "diffusers",
+    "pytorch_lightning",
+    "lightning",
+    "matplotlib",
+    "PIL",
+    "datasets",
+    "h5py",
+    "scipy",
+    "the_well",
+    "torch_fidelity",
+    "torchmetrics",
+    "torchvision",
+    "timm",
+    "wandb",
+    "rich",
+    "tqdm",
 ]
 
 add_module_names = False
@@ -81,17 +118,17 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "pytorch": ("https://docs.pytorch.org/docs/stable", None),
     "subquadratic_ops_torch": (
-        "https://nvidia-digital-bio.github.io/subquadraticOps-docs/",
+        "https://nvidia-bionemo.github.io/subquadraticOps-docs/",
         None,
     ),
 }
 
-_gh_repo = "https://github.com/NVIDIA-Digital-Bio/nvSubquadratic-private"
+_gh_repo = "https://github.com/NVIDIA-BioNeMo/nvSubquadratic"
 _gh_blob_base = f"{_gh_repo}/blob/{github_version}"
 
 extlinks = {
     "subq-ops": (
-        "https://nvidia-digital-bio.github.io/subquadraticOps-docs/%s",
+        "https://nvidia-bionemo.github.io/subquadraticOps-docs/%s",
         "subquadratic-ops: %s",
     ),
     "ghsrc": (
@@ -134,8 +171,8 @@ html_css_files = [
     "custom.css",
 ]
 html_context = {
-    "github_user": "NVIDIA-Digital-Bio",
-    "github_repo": "nvSubquadratic-private",
+    "github_user": "NVIDIA-BioNeMo",
+    "github_repo": "nvSubquadratic",
     "github_version": github_version,
     "doc_path": "docs",
 }
@@ -145,18 +182,27 @@ html_theme_options = {
     "pygments_light_style": "tango",
     "pygments_dark_style": "monokai",
     "footer_links": {},
+    "navigation_depth": 2,
+    "show_nav_level": 1,
+    "show_toc_level": 2,
 }
 
 
+# Match markdown links whose target escapes the docs/ tree via one or more
+# `../`. The path must start with an alphanumeric/underscore so we don't
+# rewrite intra-docs links like `[foo](./bar.md)` or `[foo](../README.md)`
+# that resolve fine inside the rendered site. Anchored on the closing `](`
+# of the markdown link to avoid touching unrelated parentheses.
 _REL_REPO_LINK = _re.compile(r"\]\((?:\.\./)+([A-Za-z0-9_][^)]*)\)")
 
 
 def _rewrite_repo_links(app, docname, source):
     """Rewrite markdown links like [text](../../foo/bar.py) to absolute GitHub URLs.
 
-    Preserves intra-docs relative links (no leading ../) and external URLs. Lets
-    the source markdown stay readable on GitHub web while the rendered HTML
-    points at the right blob URL.
+    Lets the source markdown stay readable on GitHub web (where the ``../``
+    paths resolve correctly inside the repo) while the rendered Sphinx HTML
+    points at the right blob URL on the active branch.  Intra-docs relative
+    links and external URLs are left untouched.
     """
     text = source[0]
     new = _REL_REPO_LINK.sub(rf"]({_gh_blob_base}/\1)", text)

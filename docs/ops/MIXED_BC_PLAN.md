@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Mixed Boundary-Condition FFT Convolution — Plan & Tracker
 
 **Status:** In progress (v1 ops + tests)

@@ -61,7 +61,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     ninja-build \
     git
 
-WORKDIR /workspaces/nvSubquadratic-private
+WORKDIR /workspaces/nvSubquadratic
 
 # ── Heavy build: Apex from source (cached until apex commit changes) ──────────
 # This layer is intentionally placed before COPY so code changes do not
@@ -81,10 +81,15 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 # ── Source: invalidated on every code change (fast — just package install) ────
 COPY . .
 
-RUN git config --global --add safe.directory /workspaces/nvSubquadratic-private
+RUN git config --global --add safe.directory /workspaces/nvSubquadratic
 
+# Full-fat dev/CI image: install every optional extra so the whole test suite
+# (distributed/Megatron CP tests, timm baselines, DALI, subq_ops CUDA kernels)
+# can run. After the 0.1.1 dependency restructure, megatron-core/timm/etc. are
+# optional extras ([distributed]/[baselines]/...), so a bare install no longer
+# pulls them — [all] restores the complete pre-restructure dependency set.
 RUN pip install --no-cache-dir wheel-stub \
-    && pip install --no-cache-dir --no-build-isolation ".[quack]" \
+    && pip install --no-cache-dir --no-build-isolation ".[all]" \
        --extra-index-url https://download.pytorch.org/whl/cu129
 
 # Set up ubuntu user's home directory and permissions
@@ -97,7 +102,7 @@ RUN chown -R ubuntu:ubuntu /workspaces && \
 USER ubuntu
 
 # Set environment variables for development mode
-ENV PYTHONPATH=/workspaces/nvSubquadratic-private
+ENV PYTHONPATH=/workspaces/nvSubquadratic
 
 # Expose Jupyter port
 EXPOSE 8888

@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# David W. Romero, 2025-09-09
+
 """Tests for ViT5HierarchicalClassificationNet.
 
 Uses a minimal stand-in mixer (linear over channels) so the tests focus on
@@ -165,3 +182,41 @@ def test_backward_runs(device) -> None:
     # Spot-check: patch_embed and reg_proj have non-zero grads.
     assert net.patch_embed.weight.grad is not None
     assert net.patch_merges[0].reg_proj.weight.grad is not None
+
+
+@pytest.mark.parametrize("layout", ["pure", "register_row"])
+def test_real_hyena_configs_forward_backward_on_cpu(monkeypatch, layout):
+    from examples.vit5_imagenet.v6_hierarchical import _base_config as config
+    from nvsubquadratic.lazy_config import instantiate
+
+    for name, value in {
+        "IMAGE_SIZE": 16,
+        "INITIAL_GRID": 4,
+        "STAGE_DIMS": [16, 32],
+        "STAGE_DEPTHS": [1, 1],
+        "NUM_STAGES": 2,
+        "STAGE_GRIDS": [4, 2],
+        "NUM_REGISTERS": 1,
+    }.items():
+        monkeypatch.setattr(config, name, value)
+    cfg = config.build_hyena_hier_net(layout)
+    for block in cfg.stage_block_cfgs:
+        block.sequence_mixer_cfg.inner_mixer_cfg.mixer_cfg.global_conv_cfg.fft_backend = "torch_fft"
+    net = instantiate(cfg)
+    logits = net({"input": torch.randn(2, 16, 16, 3)})["logits"]
+    assert logits.shape == (2, 1000)
+    logits.float().square().mean().backward()
+    assert torch.isfinite(net.patch_embed.weight.grad).all()
+    if layout == "register_row":
+        assert net.reg_token.grad.abs().sum() > 0
+        assert net.patch_merges[0].reg_proj.weight.grad.abs().sum() > 0
+
+
+@pytest.mark.parametrize("layout,num_registers", [("pure", 0), ("register_row", 1)])
+def test_hierarchy_backward_under_cpu_autocast(layout, num_registers):
+    net = _build_net(layout=layout, num_registers=num_registers)
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        logits = net({"input": torch.randn(2, 32, 32, 3)})["logits"]
+    assert logits.dtype == torch.bfloat16
+    logits.float().square().sum().backward()
+    assert torch.isfinite(net.patch_embed.weight.grad).all()
