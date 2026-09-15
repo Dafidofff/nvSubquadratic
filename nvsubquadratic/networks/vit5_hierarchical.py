@@ -70,8 +70,10 @@ def _compute_drop_path_rates(
         Nested list ``rates[stage][block]`` of floats.
     """
     total = sum(stage_depths)
-    if total <= 1 or schedule == "constant":
+    if schedule == "constant":
         flat = [max_rate] * total
+    elif total <= 1:
+        flat = [0.0] * total
     else:
         flat = [max_rate * i / (total - 1) for i in range(total)]
 
@@ -124,7 +126,8 @@ class ViT5HierarchicalNet(nn.Module):
     ):
         """Initialize the stem, stage blocks, spatial mergers and classifier."""
         super().__init__()
-        assert len(stage_specs) == 4, f"Expected 4 stages, got {len(stage_specs)}"
+        if len(stage_specs) != 4:
+            raise ValueError(f"Expected 4 stages, got {len(stage_specs)}")
 
         if any(s.num_blocks < 0 or s.hidden_dim <= 0 for s in stage_specs):
             raise ValueError("Stage depths must be nonnegative and dimensions positive.")
@@ -151,7 +154,7 @@ class ViT5HierarchicalNet(nn.Module):
             )
             self.stages.append(blocks)
 
-            if i < 3:
+            if i < len(stage_specs) - 1:
                 self.downsamplers.append(PatchMerging2D(dim=spec.hidden_dim))
 
         # Final norm + head (matches Swin/VMamba: LN → GAP → Linear)
@@ -167,7 +170,11 @@ class ViT5HierarchicalNet(nn.Module):
 
     @property
     def out_proj(self) -> nn.Linear:
-        """Return the classifier head for the shared Lightning wrapper."""
+        """Return the classifier for the wrapper; checkpoint keys remain ``head.*``.
+
+        When replacing the classifier for transfer learning, filter
+        ``network.head`` with ``DropKeysFromCheckpoint``, not ``network.out_proj``.
+        """
         return self.head
 
     def _init_head(self) -> None:
@@ -191,7 +198,7 @@ class ViT5HierarchicalNet(nn.Module):
         for i, stage_blocks in enumerate(self.stages):
             for block in stage_blocks:
                 x = block(x)  # (B, H_s, W_s, C_s)
-            if i < 3:
+            if i < len(self.downsamplers):
                 x = self.downsamplers[i](x)  # (B, H_s/2, W_s/2, 2*C_s)
 
         x = self.out_norm(x)  # (B, H4, W4, C4)
@@ -223,7 +230,7 @@ class ViT5HierarchicalNet(nn.Module):
             num_tokens = H * W
             for block in stage_blocks:
                 flops += block.flop_count(num_tokens)
-            if i < 3:
+            if i < len(self.downsamplers):
                 flops += self.downsamplers[i].flop_count(H, W)
                 H = (H + 1) // 2
 

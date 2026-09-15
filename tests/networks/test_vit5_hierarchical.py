@@ -283,7 +283,7 @@ class TestViT5HierarchicalNet:
 
     def test_requires_4_stages(self):
         specs = [_make_stage_spec(16, 1)] * 3  # only 3 stages
-        with pytest.raises(AssertionError, match="4 stages"):
+        with pytest.raises(ValueError, match="4 stages"):
             ViT5HierarchicalNet(in_channels=3, num_classes=10, stage_specs=specs)
 
     def test_flop_count_positive(self):
@@ -549,3 +549,69 @@ def test_hierarchical_leaf_recipes_defer_model_creation(monkeypatch, recipe, bas
     assert isinstance(config_to_dict(config)["net"]["stage_specs"], list)
     config = apply_config_overrides(config, ["net.num_classes=7"])
     assert config.net.num_classes == 7
+
+
+@pytest.mark.parametrize("schedule,expected", [("linear", 0.0), ("constant", 0.2)])
+def test_single_block_drop_path_schedule(schedule, expected):
+    rates = _compute_drop_path_rates(0.2, [0, 1, 0, 0], schedule)
+    assert rates == [[], [expected], [], []]
+    assert _compute_drop_path_rates(0.2, [0, 0, 0, 0], schedule) == [[], [], [], []]
+    net = ViT5HierarchicalNet(
+        in_channels=3,
+        num_classes=4,
+        stage_specs=[_make_stage_spec(dim, depth) for dim, depth in zip([8, 16, 32, 64], [0, 1, 0, 0])],
+        max_drop_path_rate=0.2,
+        drop_path_schedule=schedule,
+    )
+    assert getattr(net.stages[1][0].drop_path, "drop_prob", 0.0) == expected
+
+
+def test_stage_count_validation_survives_optimized_python():
+    import subprocess
+    import sys
+
+    code = """
+from examples.vit5_imagenet.v5_patchmerge._base_config import get_hierarchical_net_config
+from nvsubquadratic.networks.vit5_hierarchical import ViT5HierarchicalNet
+for call in (
+    lambda: get_hierarchical_net_config(stage_depths=[1, 1, 1]),
+    lambda: ViT5HierarchicalNet(in_channels=3, num_classes=4, stage_specs=[]),
+):
+    try:
+        call()
+    except ValueError as error:
+        if 'Expected 4' not in str(error):
+            raise
+    else:
+        raise RuntimeError('Invalid stage count was accepted under python -O')
+"""
+    subprocess.run([sys.executable, "-O", "-c", code], check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("compiled_source", [False, True])
+def test_pretrained_hierarchy_can_replace_classifier(compiled_source):
+    from experiments.utils.checkpointing import DropKeysFromCheckpoint, StripCompiledPrefix
+    from nvsubquadratic.lazy_config import instantiate
+
+    source = nn.Module()
+    source.network = _make_tiny_net(base_dim=8, depths=[0, 0, 0, 0], num_classes=4)
+    target = nn.Module()
+    target.network = _make_tiny_net(base_dim=8, depths=[0, 0, 0, 0], num_classes=7)
+    initial_head = target.network.head.weight.detach().clone()
+    state = source.state_dict()
+    assert "network.head.weight" in state
+    assert "network.out_proj.weight" not in state
+    if compiled_source:
+        state = {key.replace("network.", "network._orig_mod."): value for key, value in state.items()}
+    # Exercise the exact callback sequence documented in examples/patch_merging.
+    for cfg in [
+        LazyConfig(StripCompiledPrefix)(),
+        LazyConfig(DropKeysFromCheckpoint)(prefixes=("network.head",)),
+    ]:
+        state = instantiate(cfg)(state, model=target)
+    missing, unexpected = target.load_state_dict(state, strict=False)
+    assert set(missing) == {"network.head.weight", "network.head.bias"}
+    assert unexpected == []
+    torch.testing.assert_close(target.network.head.weight, initial_head)
+    torch.testing.assert_close(target.network.stem.proj.weight, source.network.stem.proj.weight)
+    assert target.network({"input": torch.randn(1, 32, 32, 3)})["logits"].shape == (1, 7)

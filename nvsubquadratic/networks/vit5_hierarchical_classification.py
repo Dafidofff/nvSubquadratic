@@ -93,6 +93,12 @@ class ViT5HierarchicalClassificationNet(nn.Module):
         """Initialise the hierarchical ViT-5 network and validate stage configs."""
         super().__init__()
         num_stages = len(stage_dims)
+        if num_stages == 0:
+            raise ValueError("At least one stage is required.")
+        if image_size <= 0 or initial_patch_size <= 0:
+            raise ValueError("image_size and initial_patch_size must be positive.")
+        if any(dim <= 0 for dim in stage_dims) or any(depth < 0 for depth in stage_depths):
+            raise ValueError("Stage dimensions must be positive and depths nonnegative.")
         if len(stage_depths) != num_stages:
             raise ValueError(f"stage_depths len ({len(stage_depths)}) != num_stages ({num_stages})")
         if len(stage_block_cfgs) != num_stages:
@@ -105,6 +111,8 @@ class ViT5HierarchicalClassificationNet(nn.Module):
             raise ValueError(f"layout must be 'pure' or 'register_row', got {layout!r}")
         if layout == "register_row" and num_registers <= 0:
             raise ValueError("layout='register_row' requires num_registers > 0")
+        if num_registers < 0 or (layout == "pure" and num_registers != 0):
+            raise ValueError("num_registers must be nonnegative and zero for layout='pure'.")
 
         self.num_stages = num_stages
         self.stage_dims = list(stage_dims)
@@ -117,17 +125,19 @@ class ViT5HierarchicalClassificationNet(nn.Module):
         self.num_classes = num_classes
 
         # Per-stage grid widths (used by GAP to skip the register row).
-        # Stage i's grid is (initial_grid // 2**i) per side.
+        # Every transition uses an even-grid 2x2 token merger. Only the final
+        # grid may be odd; this API does not use PatchMerging2D's odd-grid padding.
         initial_grid = image_size // initial_patch_size
         if initial_grid * initial_patch_size != image_size:
             raise ValueError(
                 f"image_size ({image_size}) must be divisible by initial_patch_size ({initial_patch_size})"
             )
-        self.stage_grid_sides = [initial_grid // (2**i) for i in range(num_stages)]
-        if self.stage_grid_sides[-1] < 1:
-            raise ValueError(
-                f"Final stage grid collapses to {self.stage_grid_sides[-1]} — too many stages for grid {initial_grid}"
-            )
+        self.stage_grid_sides = [initial_grid]
+        for i in range(num_stages - 1):
+            grid = self.stage_grid_sides[-1]
+            if grid % 2:
+                raise ValueError(f"Stage {i} grid {grid} must be even for 2x2 patch merging.")
+            self.stage_grid_sides.append(grid // 2)
 
         if layout == "register_row":
             final_grid_w = self.stage_grid_sides[-1]
@@ -171,6 +181,21 @@ class ViT5HierarchicalClassificationNet(nn.Module):
         )
         # Patch merges between stages.
         self.patch_merges = nn.ModuleList([instantiate(cfg) for cfg in patch_merge_cfgs])
+        for i, merger in enumerate(self.patch_merges):
+            expected = {
+                "in_dim": stage_dims[i],
+                "out_dim": stage_dims[i + 1],
+                "grid_h": self.stage_grid_sides[i],
+                "grid_w": self.stage_grid_sides[i],
+                "out_grid_h": self.stage_grid_sides[i + 1],
+                "out_grid_w": self.stage_grid_sides[i + 1],
+                "has_register_row": layout == "register_row",
+                "num_registers": num_registers,
+            }
+            for name, value in expected.items():
+                actual = getattr(merger, name, None)
+                if actual != value:
+                    raise ValueError(f"patch_merge_cfgs[{i}].{name}: expected {value!r}, got {actual!r}.")
 
         self.out_norm = instantiate(norm_cfg)
         for p in self.out_norm.parameters():

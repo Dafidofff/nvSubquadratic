@@ -42,6 +42,36 @@ The FFT backend on current main has a separate CPU bf16 shortcut-dtype limitatio
 real Hyena/FiLM smoke tests therefore use float32, while merger and hierarchy
 wiring tests cover CPU bf16 autocast independently.
 
+## Loading pretrained weights with a new classifier
+
+`ViT5HierarchicalNet` exposes `out_proj` for the shared classification wrapper,
+but its saved classifier keys are `network.head.weight` and `network.head.bias`.
+When changing the number of classes, drop `network.head` before loading weights:
+
+```python
+from experiments.default_cfg import StartFromCheckpointConfig
+from experiments.utils.checkpointing import DropKeysFromCheckpoint, StripCompiledPrefix
+from nvsubquadratic.lazy_config import LazyConfig
+
+# Set config.net.num_classes and the dataset for the new classification task.
+config.start_from_checkpoint = StartFromCheckpointConfig(
+    load=True,
+    run_path="entity/project/pretrained-run-id",
+    strict=False,
+    callbacks=[
+        LazyConfig(StripCompiledPrefix)(),
+        LazyConfig(DropKeysFromCheckpoint)(prefixes=("network.head",)),
+    ],
+)
+```
+
+`strict=False` permits the removed classifier keys; it does not permit loading
+classifier tensors with incompatible shapes. The filter is therefore required.
+For the token-based `ViT5HierarchicalClassificationNet` and the flat
+`ViT5ClassificationNet`, the corresponding prefix is `network.out_proj`.
+This keeps existing checkpoint names and avoids loading a pretrained classifier
+into a task with a different class count.
+
 ## Reconciliation with PR #122
 
 Compared original PR head `bda14549317b7724f833f9f78a6926d2ace8a1c4`, local

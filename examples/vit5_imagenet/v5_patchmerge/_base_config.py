@@ -235,7 +235,8 @@ def get_hierarchical_net_config(
     if stage_depths is None:
         stage_depths = STAGE_DEPTHS
 
-    assert len(stage_depths) == 4, f"Expected 4 stage depths, got {len(stage_depths)}"
+    if len(stage_depths) != 4:
+        raise ValueError(f"Expected 4 stage depths, got {len(stage_depths)}")
 
     stage_specs = []
     for i, (n_blocks, stage_h) in enumerate(zip(stage_depths, STAGE_HEIGHTS)):

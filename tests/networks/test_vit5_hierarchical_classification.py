@@ -220,3 +220,72 @@ def test_hierarchy_backward_under_cpu_autocast(layout, num_registers):
     assert logits.dtype == torch.bfloat16
     logits.float().square().sum().backward()
     assert torch.isfinite(net.patch_embed.weight.grad).all()
+
+
+@pytest.mark.parametrize(
+    "changes,field",
+    [
+        ({"grid_h": 2, "grid_w": 24}, "grid_h"),
+        ({"in_dim": 4}, "in_dim"),
+        ({"out_dim": 32}, "out_dim"),
+        ({"has_register_row": False, "num_registers": 0}, "has_register_row"),
+        ({"num_registers": 2}, "num_registers"),
+    ],
+)
+def test_mismatched_merger_rejected_before_forward(changes, field):
+    cfg = _make_pm_cfg(8, 16, 8, 1, True)
+    for key, value in changes.items():
+        cfg[key] = value
+    # The 2x24 merger consumes the SAME 72 input tokens as an 8x8 grid plus
+    # register row. Without validation it can silently move the GAP boundary.
+    with pytest.raises(ValueError, match=rf"patch_merge_cfgs\[0\].{field}"):
+        ViT5HierarchicalClassificationNet(
+            in_channels=3,
+            num_classes=4,
+            image_size=32,
+            initial_patch_size=4,
+            stage_dims=[8, 16],
+            stage_depths=[0, 0],
+            stage_block_cfgs=[LazyConfig(nn.Identity)()] * 2,
+            patch_merge_cfgs=[cfg],
+            norm_cfg=LazyConfig(RMSNorm)(dim=16),
+            layout="register_row",
+            num_registers=1,
+        )
+
+
+def test_odd_intermediate_grid_is_rejected():
+    with pytest.raises(ValueError, match="Stage 1 grid 3 must be even"):
+        ViT5HierarchicalClassificationNet(
+            in_channels=3,
+            num_classes=4,
+            image_size=24,
+            initial_patch_size=4,
+            stage_dims=[8, 16, 32],
+            stage_depths=[0, 0, 0],
+            stage_block_cfgs=[LazyConfig(nn.Identity)()] * 3,
+            patch_merge_cfgs=[_make_pm_cfg(8, 16, 6, 0, False), LazyConfig(nn.Identity)()],
+            norm_cfg=LazyConfig(RMSNorm)(dim=32),
+        )
+
+
+@pytest.mark.parametrize("layout,num_registers", [("pure", 0), ("register_row", 1)])
+def test_odd_final_grid_is_supported(layout, num_registers):
+    net = ViT5HierarchicalClassificationNet(
+        in_channels=3,
+        num_classes=4,
+        image_size=24,
+        initial_patch_size=4,
+        stage_dims=[8, 16],
+        stage_depths=[0, 0],
+        stage_block_cfgs=[LazyConfig(nn.Identity)()] * 2,
+        patch_merge_cfgs=[_make_pm_cfg(8, 16, 6, num_registers, layout == "register_row")],
+        norm_cfg=LazyConfig(RMSNorm)(dim=16, use_quack=False),
+        layout=layout,
+        num_registers=num_registers,
+    )
+    assert net.stage_grid_sides == [6, 3]
+    logits = net({"input": torch.randn(2, 24, 24, 3)})["logits"]
+    assert logits.shape == (2, 4)
+    logits.square().sum().backward()
+    assert torch.isfinite(net.patch_embed.weight.grad).all()
