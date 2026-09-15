@@ -80,16 +80,18 @@ def test_equal_seeds_reproduce_sample_sequences():
     assert not torch.equal(dataset(seed=7)[0][1], dataset(seed=23)[0][1])
 
 
-@pytest.mark.parametrize("max_step", [0, 0.25, 1, 2.5])
+@pytest.mark.parametrize("length", [1, 2, 3, 6, 16])
+@pytest.mark.parametrize("max_step", [0, 0.25, 0.5, 1, 1.5, 2, 2.5, 3])
 @pytest.mark.parametrize("limit", [0, 2, 20])
-def test_sweeps_are_bounded_monotone_and_obey_rounded_step_cap(max_step, limit):
+def test_sweeps_are_bounded_monotone_and_obey_rounded_step_cap(length, max_step, limit):
     for seed in range(10):
-        offsets = motion._random_sweep_offsets(6, limit, max_step, torch.Generator().manual_seed(seed))
+        offsets = motion._random_sweep_offsets(length, limit, max_step, torch.Generator().manual_seed(seed))
         steps = offsets.diff()
         assert offsets.dtype == torch.long
         assert torch.all((offsets >= 0) & (offsets <= limit))
         assert torch.all(steps >= 0) or torch.all(steps <= 0)
-        assert steps.abs().max() <= torch.ceil(torch.tensor(max_step))
+        if steps.numel():
+            assert steps.abs().max() <= torch.ceil(torch.tensor(max_step))
 
 
 def test_no_motion_or_spin_preserves_each_source_frame():
@@ -124,14 +126,18 @@ def test_invalid_geometry_and_motion_fail_early(overrides):
 
 
 class SyntheticDataModule(pl.LightningDataModule):
-    def __init__(self):
+    def __init__(self, channels=1, num_workers=0):
         super().__init__()
-        self.batch_size, self.num_workers, self.pin_memory, self.seed = 2, 0, False, 7
+        self.batch_size, self.num_workers, self.pin_memory, self.seed = 2, num_workers, False, 7
+        self.input_channels, self.output_channels = channels, 10
 
     def setup(self, stage=None):
-        self.train_dataset = images()
-        self.val_dataset = images()
-        self.test_dataset = images()
+        source = images()
+        source = TensorDataset(source.tensors[0].repeat(1, self.input_channels, 1, 1), source.tensors[1])
+        if stage in (None, "fit"):
+            self.train_dataset = self.val_dataset = source
+        if stage in (None, "test"):
+            self.test_dataset = source
 
 
 def datamodule(data_type="volume", **overrides):
@@ -152,9 +158,7 @@ def test_datamodule_split_loaders_and_batch_layout(data_type):
     with pytest.raises(RuntimeError):
         dm.train_dataloader()
     dm.setup()
-    assert dm.train_dataset.generator.initial_seed() == 1007
-    assert dm.val_dataset.generator.initial_seed() == 2007
-    assert dm.test_dataset.generator.initial_seed() == 3007
+    assert len({split.generator.initial_seed() for split in (dm.train_dataset, dm.val_dataset, dm.test_dataset)}) == 3
     for loader in (dm.train_dataloader(), dm.val_dataloader(), dm.test_dataloader()):
         batch = dm.on_before_batch_transfer(next(iter(loader)), 0)
         assert batch["condition"] is None
@@ -211,3 +215,56 @@ def test_worker_rngs_use_unique_reproducible_pytorch_seeds(monkeypatch):
     dm = datamodule()
     dm.setup("fit")
     assert dm.train_dataloader().worker_init_fn is motion._seed_motion_worker
+
+
+@pytest.mark.parametrize("num_workers", [0, 2])
+def test_rank_motion_streams_are_distinct_and_reproducible(num_workers):
+    def samples(rank):
+        dm = datamodule(base_datamodule_cfg=LazyConfig(SyntheticDataModule)(num_workers=num_workers))
+        dm.trainer = SimpleNamespace(global_rank=rank)
+        dm.setup()
+        assert dm.seed == dm._base_datamodule.seed == 7
+        result = []
+        for loader in (dm.train_dataloader(), dm.val_dataloader(), dm.test_dataloader()):
+            # Consume real worker processes when num_workers > 0.
+            result.append(torch.cat([target for _, target in loader]))
+        return result
+
+    rank0, repeated, rank1 = samples(0), samples(0), samples(1)
+    for a, b, c in zip(rank0, repeated, rank1):
+        torch.testing.assert_close(a, b, rtol=0, atol=0)
+        assert not torch.equal(a, c)
+
+
+@pytest.mark.parametrize("data_type", ["volume", "sequence"])
+def test_rgb_channel_metadata_matches_batches_and_projection(data_type):
+    dm = datamodule(data_type, base_datamodule_cfg=LazyConfig(SyntheticDataModule)(channels=3))
+    # Metadata must be usable to build the network before setup.
+    assert dm.input_channels == dm.output_channels == 3
+    projection = torch.nn.Linear(dm.input_channels, 8)
+    dm.setup("fit")
+    batch = dm.on_before_batch_transfer(next(iter(dm.train_dataloader())), 0)
+    assert batch["input"].shape[-1] == batch["label"].shape[-1] == 3
+    assert projection(batch["input"]).shape[-1] == 8
+
+
+def test_sequence_readout_gather_matches_volume_crop():
+    dm = datamodule("sequence")
+    S, b = dm.canvas_size, dm.block_size
+    # Give every voxel a unique value to distinguish the cube from the tail.
+    prediction_volume = torch.arange(S**3).reshape(1, 1, S, S, S)
+    target = prediction_volume[:, :, -b:, -b:, -b:]
+    batch = dm.on_before_batch_transfer((prediction_volume, target), 0)
+    prediction = batch["input"]
+    coords = torch.arange(S - b, S, device=prediction.device)
+    d, h, w = torch.meshgrid(coords, coords, coords, indexing="ij")
+    indices = (d * S * S + h * S + w).reshape(-1)
+    readout = prediction.index_select(1, indices)
+    torch.testing.assert_close(readout, batch["label"])
+    assert not torch.equal(prediction[:, -(b**3) :], batch["label"])
+
+
+def test_translation_actually_moves_the_image():
+    block = motion._make_motion_block(images()[0][0], 4, 6, torch.Generator().manual_seed(7), 1, False)
+    assert not torch.equal(block[:, 0], block[:, -1])
+    assert torch.all(block.amax(dim=(0, 2, 3)) > 0)

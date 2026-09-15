@@ -37,8 +37,10 @@ Usage:
     PYTHONPATH=. python experiments/datamodules/spatial_recall_dataset.py --mode 1d
 """
 
+import math
 from typing import Literal, Optional, Tuple
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 from einops import rearrange
@@ -1982,7 +1984,12 @@ def _random_sweep_offsets(
             # Shrink wide sweeps about their centre before voxel rounding.
             centre = limit / 2.0
             x = centre + (x - centre) * (max_step / step)
-    return torch.clamp(torch.round(x), 0, limit).long()
+    offsets = torch.clamp(torch.round(x), 0, limit).long()
+    # Half-to-even ties can expand an integer-sized step by one voxel.
+    # Clamp rounded increments as well, preserving monotonicity and bounds.
+    cap = min(math.ceil(max_step), limit)
+    steps = offsets.diff().clamp(min=-cap, max=cap)
+    return torch.cat((offsets[:1], offsets[:1] + steps.cumsum(dim=0)))
 
 
 def _make_motion_block(
@@ -2238,7 +2245,7 @@ def _seed_motion_worker(worker_id: int) -> None:
 class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
     """DataModule for the 3D motion spatial recall (moving-digit copy) task.
 
-    Wraps a grayscale base datamodule (EMNIST, MNIST, ...) to produce cubic
+    Wraps an image base datamodule (EMNIST, MNIST, ...) to produce cubic
     ``canvas_size³`` volumes containing a moving-digit ``block_size³`` tube
     that must be recalled at the readout corner.
 
@@ -2301,10 +2308,6 @@ class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
         self._val_generator: Optional[torch.Generator] = None
         self._test_generator: Optional[torch.Generator] = None
 
-        # Input/output channels.
-        self.input_channels = 1
-        self.output_channels = 1
-
         # Datasets.
         self.train_dataset: Optional[Dataset] = None
         self.val_dataset: Optional[Dataset] = None
@@ -2312,7 +2315,8 @@ class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
 
     def _instantiate_base_datamodule(self) -> pl.LightningDataModule:
         """Instantiate the base datamodule from LazyConfig."""
-        self._base_datamodule = instantiate(self._base_datamodule_cfg)
+        if self._base_datamodule is None:
+            self._base_datamodule = instantiate(self._base_datamodule_cfg)
         return self._base_datamodule
 
     def _extract_base_properties(self) -> None:
@@ -2323,10 +2327,38 @@ class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
         self._pin_memory = base.pin_memory
         self._seed = base.seed
 
-        self._generator = torch.Generator().manual_seed(self._seed)
-        self._train_generator = torch.Generator().manual_seed(self._seed + 1000)
-        self._val_generator = torch.Generator().manual_seed(self._seed + 2000)
-        self._test_generator = torch.Generator().manual_seed(self._seed + 3000)
+        # Include rank for both DataLoader worker seeds and num_workers=0.
+        # Keep the base seed unchanged: dataset splits must agree across ranks.
+        rank = self.trainer.global_rank if self.trainer is not None else 0
+        if self.trainer is None and torch.distributed.is_initialized():
+            rank = torch.distributed.get_rank()
+
+        def generator(stream: int) -> torch.Generator:
+            seed = int(np.random.SeedSequence([self._seed, rank, stream]).generate_state(1, dtype=np.uint64)[0])
+            return torch.Generator().manual_seed(seed)
+
+        self._generator = generator(0)
+        self._train_generator = generator(1)
+        self._val_generator = generator(2)
+        self._test_generator = generator(3)
+
+    @property
+    def input_channels(self) -> int:
+        """Read source image channels, available before setup or download.
+
+        Returns:
+            Number of image channels advertised by the base datamodule.
+        """
+        return self._instantiate_base_datamodule().input_channels
+
+    @property
+    def output_channels(self) -> int:
+        """Read the recall target's channel count.
+
+        Returns:
+            Source image channels; the base class-label count is irrelevant.
+        """
+        return self.input_channels
 
     @property
     def batch_size(self) -> int:
@@ -2458,7 +2490,7 @@ class SpatialRecall3DMotionDataModule(pl.LightningDataModule):
             [B, C, b, b, b], before the batch-transfer hook.
         """
         if self.val_dataset is None:
-            raise RuntimeError("Call setup('fit') before requesting val dataloader.")
+            raise RuntimeError("Call setup('fit') or setup('validate') before requesting val dataloader.")
         return self._build_loader(self.val_dataset, shuffle=False, drop_last=False)
 
     def test_dataloader(self) -> DataLoader:

@@ -46,7 +46,7 @@ assert torch.count_nonzero(canvas[:, -6:, -6:, -6:]) == 0
 
 ## Lightning integration
 
-`SpatialRecall3DMotionDataModule` wraps a grayscale base datamodule such as
+`SpatialRecall3DMotionDataModule` wraps an image base datamodule such as
 MNIST or EMNIST using its existing lazy configuration:
 
 ```python
@@ -77,19 +77,43 @@ module = SpatialRecall3DMotionDataModule(
 # then module.setup("fit") to construct the train/validation datasets.
 ```
 
+The wrapper derives `input_channels` and `output_channels` from the base
+module's `input_channels`, including before setup. The target copies image
+channels, so the base module's number of classes is irrelevant. Grayscale and
+RGB image sources are supported; the base must expose `input_channels`.
+
 The batch-transfer hook returns `{"input": x, "label": y, "condition": None}`.
-With `data_type="volume"`, shapes are `[B, S, S, S, 1]` and `[B, b, b, b, 1]`;
-with `"sequence"`, they are `[B, S**3, 1]` and `[B, b**3, 1]`. A regression
-network must read out the final `b` positions along each spatial axis (for
-`ResidualNetwork`, use `target_size=[b, b, b]`) and compare that output to the
-label. No model architecture change is required by the dataset.
+With `data_type="volume"`, shapes are `[B, S, S, S, C]` and `[B, b, b, b, C]`.
+A regression network reads the final `b` positions along each spatial axis;
+for `ResidualNetwork`, use `data_dim=3` and `target_size=[b, b, b]`.
+
+With `data_type="sequence"`, shapes are `[B, S**3, C]` and `[B, b**3, C]`.
+Flattening uses depth-height-width order: token index is `d*S*S + h*S + w`.
+The readout cube is **not** the final `b**3` tokens. A sequence model must
+produce predictions for the full canvas, then gather the cube before comparing
+to the label (in the model's readout or the loss):
+
+```python
+# prediction: full-canvas model output [B, S**3, C]
+S, b = module.canvas_size, module.block_size
+coords = torch.arange(S - b, S, device=prediction.device)
+d, h, w = torch.meshgrid(coords, coords, coords, indexing="ij")
+indices = (d * S * S + h * S + w).reshape(-1)
+readout = prediction.index_select(1, indices)  # [B, b**3, C], label order
+```
+
+This gather must be wired explicitly for sequence mode. `ResidualNetwork`'s
+built-in spatial crop supports the volume recipe above; its one-dimensional
+tail crop does not select this cube, and a three-axis `target_size` is invalid
+for a sequence input.
 
 ## Sampling semantics
 
 - Require `0 < digit_size <= block_size` and `canvas_size >= 2 * block_size`,
   including fixed placement, so source and readout cannot overlap.
 - `max_step` is a finite, nonnegative **per-axis continuous** step limit.
-  Voxel rounding permits integer jumps up to `ceil(max_step)`; this is not a
+  Rounded increments are clamped to `ceil(max_step)`, including half-to-even
+  rounding ties; this is not a
   bound on Euclidean speed or on pixel displacement due to rotation. Zero
   disables translation but does not disable spin.
 - Sweeps shrink about their centre when needed to respect the continuous
@@ -104,9 +128,13 @@ label. No model architecture change is required by the dataset.
   is observed.
 - Sampling advances generator state on each access. Equal seeds reproduce
   equal access sequences; a sample is not a fixed function of its index.
-  The datamodule starts train/validation/test generators at base seed plus
-  1000/2000/3000. Loader workers receive distinct PyTorch worker seeds.
-  Reproduction also requires the same loader order and worker count. Validation
+  The datamodule derives loader and train/validation/test seeds from the base
+  seed, global rank, and stream ID using NumPy `SeedSequence`. Base dataset
+  splits retain the original seed on every rank. Motion streams differ across
+  ranks, including with zero loader workers; workers seed their motion RNGs
+  from the rank-dependent PyTorch worker seeds. This corrects the former
+  rank-identical streams and changes samples for a given historical seed.
+  Reproduction also requires the same rank, loader order, and worker count. Validation
   draws new motion samples on successive passes; compare frozen samples when
   exact repeated inputs are required.
 
