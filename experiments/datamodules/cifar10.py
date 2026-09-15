@@ -74,6 +74,8 @@ class CIFAR10DataModule(pl.LightningDataModule):
         mixup: Mixup alpha (0 = disabled).
         cutmix: CutMix alpha (0 = disabled).
         num_classes: Number of output classes (10).
+        label_smoothing: Smoothing applied to Mixup/CutMix targets (default 0.1,
+            preserving the historical recipe). Ignored when mixing is disabled.
     """
 
     def __init__(
@@ -86,9 +88,12 @@ class CIFAR10DataModule(pl.LightningDataModule):
         mixup: float = 0.0,
         cutmix: float = 0.0,
         num_classes: int = 10,
+        label_smoothing: float = 0.1,
     ):
         """Initialize the CIFAR-10 datamodule (see class docstring for args)."""
         super().__init__()
+        if not 0.0 <= label_smoothing <= 1.0:
+            raise ValueError("label_smoothing must be between 0 and 1.")
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -96,6 +101,7 @@ class CIFAR10DataModule(pl.LightningDataModule):
         self.image_size = image_size
         self.num_classes = num_classes
         self.output_channels = num_classes
+        self.label_smoothing = label_smoothing
 
         # timm Mixup/CutMix (only active during training)
         use_mix = mixup > 0 or cutmix > 0
@@ -107,6 +113,7 @@ class CIFAR10DataModule(pl.LightningDataModule):
                 switch_prob=0.5,
                 mode="batch",
                 num_classes=num_classes,
+                label_smoothing=label_smoothing,
             )
             if use_mix
             else None

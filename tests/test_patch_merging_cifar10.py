@@ -46,3 +46,50 @@ def test_cifar_validation_batch_contract(monkeypatch, source):
     assert batch["label"].dtype == torch.long
     assert batch["condition"] is None
     assert dm.output_channels == 10
+
+
+def test_hyena_pair_has_matching_optimizer_budget():
+    from examples.vit5_imagenet.v6_hierarchical.cifar10 import hyena_flat, hyena_hier
+
+    configs = [recipe.get_config() for recipe in (hyena_flat, hyena_hier)]
+    for cfg in configs:
+        assert cfg.dataset.batch_size * cfg.train.accumulate_grad_steps == 256
+        assert cfg.train.iterations == 19_500
+        assert cfg.scheduler.warmup_iterations_percentage * cfg.train.iterations == 975
+
+
+@pytest.mark.parametrize("smoothing", [0.0, 0.1, 0.3])
+def test_cifar_mixup_targets_use_explicit_smoothing(monkeypatch, smoothing):
+    from experiments.datamodules import cifar10 as module
+
+    # Identical classes make the expected target independent of the random mix ratio.
+    samples = TensorDataset(torch.randn(4, 3, 32, 32), torch.full((4,), 3))
+    monkeypatch.setattr(module.datasets, "CIFAR10", lambda *args, **kwargs: samples)
+    dm = module.CIFAR10DataModule(batch_size=4, num_workers=0, pin_memory=False, mixup=0.8, label_smoothing=smoothing)
+    dm.setup("fit")
+    batch = next(iter(dm.train_dataloader()))
+    expected = torch.full((4, 10), smoothing / 10)
+    expected[:, 3] += 1 - smoothing
+    torch.testing.assert_close(batch["label"], expected)
+    assert next(iter(dm.val_dataloader()))["label"].dtype == torch.long
+
+
+@pytest.mark.parametrize("smoothing", [-0.1, 1.1])
+def test_cifar_rejects_invalid_smoothing(smoothing):
+    from experiments.datamodules.cifar10 import CIFAR10DataModule
+
+    with pytest.raises(ValueError, match="label_smoothing"):
+        CIFAR10DataModule(label_smoothing=smoothing)
+
+
+@pytest.mark.parametrize(
+    "recipe", ["flat_p4", "flat_p8", "flat_p16", "hier_p4", "hier_p8", "hier_p16", "hyena_flat", "hyena_hier"]
+)
+def test_cifar_recipes_record_smoothing(recipe):
+    from importlib import import_module
+
+    from experiments.utils.cli import config_to_dict
+
+    module = import_module(f"examples.vit5_imagenet.v6_hierarchical.cifar10.{recipe}")
+    cfg = config_to_dict(module.get_config())
+    assert cfg["dataset"]["label_smoothing"] == 0.1

@@ -30,8 +30,9 @@ possible while keeping dims as multiples of 8 and a meaningful pyramid width.
   base_dim=88 → 24.1 M
   base_dim=96 → 28.5 M  (Swin-T default)
 
-This is the TREATMENT run.  Compare against isotropic_hyena.py to isolate
-the effect of Swin-style patch merging on CIFAR-10.
+Compare against isotropic_hyena.py as an architectural comparison.
+Widths, normalization and compute also differ; this does not isolate
+the effect of patch merging alone.
 
 Run::
 

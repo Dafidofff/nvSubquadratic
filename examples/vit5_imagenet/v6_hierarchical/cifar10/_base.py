@@ -226,6 +226,7 @@ def _base_config() -> ExperimentConfig:
         image_size=IMAGE_SIZE,
         mixup=0.8,
         cutmix=1.0,
+        label_smoothing=0.1,
     )
 
     config.lightning_wrapper_class = LazyConfig(ClassificationWrapper)(loss="soft_target_ce")

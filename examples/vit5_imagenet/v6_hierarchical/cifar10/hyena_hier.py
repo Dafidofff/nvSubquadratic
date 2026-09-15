@@ -28,7 +28,8 @@ Training recipe
     Standard augmentation: RandomCrop(32,pad=4) + RandomHorizontalFlip
 
 This is a diagnostic run to compare classification performance against the
-flat (no patch-merging) baseline at the same compute and epoch budget.
+flat (no patch-merging) baseline at the same approximate image-exposure
+budget. The architectures are not compute-matched.
 """
 
 import os
@@ -223,6 +224,7 @@ def get_config() -> ExperimentConfig:
         image_size=IMAGE_SIZE,
         mixup=0.8,
         cutmix=1.0,
+        label_smoothing=0.1,
     )
 
     config.lightning_wrapper_class = LazyConfig(ClassificationWrapper)(loss="soft_target_ce")

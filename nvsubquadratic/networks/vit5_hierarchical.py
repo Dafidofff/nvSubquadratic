@@ -157,7 +157,11 @@ class ViT5HierarchicalNet(nn.Module):
         # Final norm + head (matches Swin/VMamba: LN → GAP → Linear)
         final_dim = stage_specs[-1].hidden_dim
         self.out_norm = nn.LayerNorm(final_dim)
+        # Follow ViT5ClassificationNet's explicit no-decay normalization policy.
+        for param in self.out_norm.parameters():
+            param._no_weight_decay = True
         self.head = nn.Linear(final_dim, num_classes, bias=True)
+        self.head.bias._no_weight_decay = True
 
         self._init_head()
 

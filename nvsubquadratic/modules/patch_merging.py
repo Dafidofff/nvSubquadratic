@@ -202,6 +202,9 @@ class PatchEmbedHierarchical(nn.Module):
         super().__init__()
         self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=4, stride=4, bias=True)
         self.norm = nn.LayerNorm(embed_dim)
+        for param in self.norm.parameters():
+            param._no_weight_decay = True
+        self.proj.bias._no_weight_decay = True
         nn.init.trunc_normal_(self.proj.weight, std=0.02)
         nn.init.zeros_(self.proj.bias)
 
@@ -263,6 +266,8 @@ class PatchMerging2D(nn.Module):
         super().__init__()
         self.dim = dim
         self.norm = nn.LayerNorm(4 * dim)
+        for param in self.norm.parameters():
+            param._no_weight_decay = True
         self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
         nn.init.trunc_normal_(self.reduction.weight, std=0.02)
 

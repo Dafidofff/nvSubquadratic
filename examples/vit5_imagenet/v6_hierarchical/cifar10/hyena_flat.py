@@ -24,8 +24,9 @@ Architecture
 Training recipe
     Identical to cifar10_hyena_hier: ~100 epochs, AdamW, cosine, bf16-mixed.
 
-The flat run is the no-merging baseline: same epoch budget, same kernel,
-same compute per block — only the hierarchical structure differs.
+The flat run is the no-merging baseline: same approximate image-exposure
+budget and kernel family. Widths, token counts and compute differ between
+the flat and hierarchical architectures.
 """
 
 import os
@@ -91,7 +92,7 @@ KERNEL_OFF_BLOCK_SCALE = 0.1
 # ─── Training (identical to hier) ─────────────────────────────────────────────
 TARGET_EPOCHS = 100
 CIFAR10_TRAIN_SIZE = 50_000
-ITERS_PER_EPOCH = CIFAR10_TRAIN_SIZE // BATCH_SIZE
+ITERS_PER_EPOCH = CIFAR10_TRAIN_SIZE // (BATCH_SIZE * ACCUM_STEPS)
 TOTAL_ITERATIONS = TARGET_EPOCHS * ITERS_PER_EPOCH
 WARMUP_EPOCHS = 5
 WARMUP_ITERATIONS_PERCENTAGE = WARMUP_EPOCHS / TARGET_EPOCHS
@@ -202,6 +203,7 @@ def get_config() -> ExperimentConfig:
         image_size=IMAGE_SIZE,
         mixup=0.8,
         cutmix=1.0,
+        label_smoothing=0.1,
     )
 
     config.lightning_wrapper_class = LazyConfig(ClassificationWrapper)(loss="soft_target_ce")

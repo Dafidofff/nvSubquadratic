@@ -23,8 +23,9 @@ Architecture: flat 12-block ViT5ClassificationNet.
   - SiLU + Sigmoid gates, L2 QK-norm, output RMSNorm
   - Drop-path rate 0.05
 
-This is the CONTROL run.  Compare against hierarchical_hyena.py to isolate
-the effect of Swin-style patch merging on CIFAR-10.
+Compare against hierarchical_hyena.py as an architectural comparison.
+Widths, normalization and compute also differ; this does not isolate
+the effect of patch merging alone.
 
 Run::
 

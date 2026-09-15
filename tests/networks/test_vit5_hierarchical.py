@@ -56,6 +56,47 @@ from nvsubquadratic.networks.vit5_hierarchical import (
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+def test_spatial_norm_decay_matches_vit5_classification():
+    from experiments.lightning_wrappers.base_lightning_wrapper import _build_param_groups
+    from nvsubquadratic.lazy_config import instantiate
+    from nvsubquadratic.networks.vit5_classification import ViT5ClassificationNet
+
+    # Use the runner's lazy-instantiation path, with no blocks to isolate stem,
+    # mergers and classifier from the existing mixers' regularization policies.
+    spatial = instantiate(
+        LazyConfig(ViT5HierarchicalNet)(
+            in_channels=3,
+            num_classes=10,
+            stage_specs=[StageSpec(0, d, LazyConfig(nn.Identity)()) for d in (8, 16, 32, 64)],
+        )
+    )
+    flat = instantiate(
+        LazyConfig(ViT5ClassificationNet)(
+            in_channels=3,
+            num_classes=10,
+            hidden_dim=8,
+            num_blocks=0,
+            patch_size=4,
+            image_size=32,
+            num_registers=0,
+            norm_cfg=LazyConfig(nn.LayerNorm)(normalized_shape=8),
+            readout="gap",
+            block_cfg=LazyConfig(nn.Identity)(),
+        )
+    )
+    for net in (spatial, flat):
+        groups = _build_param_groups(net, default_weight_decay=0.05)
+        decay = {id(p): group["weight_decay"] for group in groups for p in group["params"]}
+        assert len(decay) == len(list(net.parameters()))
+        for module in net.modules():
+            if isinstance(module, nn.LayerNorm):
+                assert all(decay[id(p)] == 0 for p in module.parameters())
+            elif isinstance(module, (nn.Conv2d, nn.Linear)):
+                assert decay[id(module.weight)] == 0.05
+                if module.bias is not None:
+                    assert decay[id(module.bias)] == 0
+
+
 class _IdentityMixer(nn.Module):
     """Trivial sequence mixer: returns input unchanged.  For shape-only tests."""
 
