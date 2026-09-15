@@ -41,12 +41,12 @@ Run::
 """
 
 from examples.patch_merging.cifar10._base import NUM_CLASSES, get_base_config
-from examples.vit5_imagenet.v5_patchmerge._base_config import build_hierarchical_net
+from examples.vit5_imagenet.v5_patchmerge._base_config import get_hierarchical_net_config
 from experiments.default_cfg import ExperimentConfig
 
 
 def get_config() -> ExperimentConfig:
     """Build hierarchical Hyena config for CIFAR-10 single-GPU training."""
     config = get_base_config()
-    config.net = build_hierarchical_net(base_dim=80, fft_backend="torch_fft", num_classes=NUM_CLASSES)
+    config.net = get_hierarchical_net_config(base_dim=80, fft_backend="torch_fft", num_classes=NUM_CLASSES)
     return config

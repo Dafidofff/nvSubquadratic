@@ -470,3 +470,82 @@ class TestBlockDiagOverrides:
             assert actual_max == pytest.approx(expected_max, rel=0.05), (
                 f"Stage {stage_idx} (h={stage_h}): expected ω₀_max≈{expected_max}, got {actual_max}"
             )
+
+
+@pytest.mark.parametrize("block_diag", [False, True])
+def test_lazy_hierarchy_seed_logging_and_optimizer_policy(block_diag):
+    import json
+    import warnings
+
+    from examples.vit5_imagenet.v5_patchmerge._base_config import get_hierarchical_net_config
+    from examples.vit5_imagenet.v5_patchmerge._blockdiag import apply_block_diag_config_overrides
+    from experiments.lightning_wrappers.base_lightning_wrapper import _build_param_groups
+    from experiments.utils.cli import config_to_dict
+    from nvsubquadratic.lazy_config import instantiate
+
+    rng_before = torch.get_rng_state().clone()
+    cfg = get_hierarchical_net_config(base_dim=8, stage_depths=[1, 1, 1, 1], fft_backend="torch_fft", num_classes=4)
+    if block_diag:
+        apply_block_diag_config_overrides(cfg)
+    assert torch.equal(rng_before, torch.get_rng_state())
+    serialized = json.loads(json.dumps(config_to_dict(cfg)))
+    assert serialized["stage_specs"][0]["hidden_dim"] == 8
+    kernel = serialized["stage_specs"][0]["block_cfg"]["sequence_mixer_cfg"]["mixer_cfg"]["global_conv_cfg"][
+        "kernel_cfg"
+    ]
+    assert kernel["L_cache"] == 56
+    assert ("BlockDiagonal" in kernel["__target__"]) == block_diag
+
+    torch.manual_seed(42)
+    first = instantiate(cfg)
+    torch.manual_seed(42)
+    repeated = instantiate(cfg)
+    for name, value in first.state_dict().items():
+        torch.testing.assert_close(value, repeated.state_dict()[name], rtol=0, atol=0)
+    torch.manual_seed(43)
+    different = instantiate(cfg)
+    assert not torch.equal(first.stem.proj.weight, different.stem.proj.weight)
+    with warnings.catch_warnings():
+        # Existing GRN/shortcut warnings are unrelated to the stem/merger policy.
+        warnings.simplefilter("ignore", UserWarning)
+        groups = _build_param_groups(first, default_weight_decay=0.05)
+    decay = {id(p): g["weight_decay"] for g in groups for p in g["params"]}
+    for module in first.modules():
+        if isinstance(module, nn.LayerNorm):
+            assert all(decay[id(p)] == 0 for p in module.parameters())
+    assert decay[id(first.head.bias)] == 0
+    assert decay[id(first.head.weight)] == 0.05
+    first.eval()
+    first({"input": torch.randn(1, 32, 32, 3)})["logits"].sum().backward()
+    assert first.stem.proj.weight.grad is not None
+    assert first.head.weight.grad is not None
+
+
+@pytest.mark.parametrize(
+    "recipe,base_helper",
+    [
+        ("examples.patch_merging.cifar10.hierarchical_hyena", None),
+        ("examples.vit5_imagenet.local_comparison.hierarchical_hyena", "get_local_base_config"),
+        ("examples.vit5_imagenet.v5_patchmerge.hierarchical_full_hyena", "get_base_config"),
+        ("examples.vit5_imagenet.v5_patchmerge.hierarchical_full_hyena_blockdiag", "get_base_config"),
+    ],
+)
+def test_hierarchical_leaf_recipes_defer_model_creation(monkeypatch, recipe, base_helper):
+    from importlib import import_module
+
+    from omegaconf import DictConfig
+
+    from experiments.default_cfg import ExperimentConfig
+    from experiments.utils.cli import apply_config_overrides, config_to_dict
+
+    module = import_module(recipe)
+    if base_helper:
+        # Only replace the unrelated Apex/DALI training recipe dependency.
+        monkeypatch.setattr(module, base_helper, lambda **kwargs: ExperimentConfig())
+    before = torch.get_rng_state().clone()
+    config = module.get_config()
+    assert torch.equal(before, torch.get_rng_state())
+    assert isinstance(config.net, DictConfig)
+    assert isinstance(config_to_dict(config)["net"]["stage_specs"], list)
+    config = apply_config_overrides(config, ["net.num_classes=7"])
+    assert config.net.num_classes == 7

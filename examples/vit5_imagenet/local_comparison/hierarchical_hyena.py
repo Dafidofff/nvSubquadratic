@@ -36,12 +36,12 @@ Run::
 """
 
 from examples.vit5_imagenet.local_comparison._base_local import get_local_base_config
-from examples.vit5_imagenet.v5_patchmerge._base_config import build_hierarchical_net
+from examples.vit5_imagenet.v5_patchmerge._base_config import get_hierarchical_net_config
 from experiments.default_cfg import ExperimentConfig
 
 
 def get_config() -> ExperimentConfig:
     """Build hierarchical pure-Hyena config for local single-GPU training."""
     config = get_local_base_config(epochs=100)
-    config.net = build_hierarchical_net(base_dim=96)
+    config.net = get_hierarchical_net_config(base_dim=96)
     return config

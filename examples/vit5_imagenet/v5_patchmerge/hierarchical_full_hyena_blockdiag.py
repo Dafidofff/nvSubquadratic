@@ -28,10 +28,10 @@ replacing the scalar-ω₀ SIREN at every block.
 """
 
 from examples.vit5_imagenet.v5_patchmerge._base_config import (
-    build_hierarchical_net,
     get_base_config,
+    get_hierarchical_net_config,
 )
-from examples.vit5_imagenet.v5_patchmerge._blockdiag import apply_block_diag_overrides
+from examples.vit5_imagenet.v5_patchmerge._blockdiag import apply_block_diag_config_overrides
 from experiments.default_cfg import ExperimentConfig
 
 
@@ -40,8 +40,7 @@ def get_config() -> ExperimentConfig:
     config = get_base_config()
     config.compile = True
     config.compile_mode = "max-autotune-no-cudagraphs"
-    net = build_hierarchical_net(base_dim=96)
-    apply_block_diag_overrides(net)
-    config.net = net
+    config.net = get_hierarchical_net_config(base_dim=96)
+    apply_block_diag_config_overrides(config.net)
     config.wandb.job_group = "v5_patchmerge"
     return config

@@ -40,15 +40,15 @@ Key design choices vs. the isotropic vit5_hybrid configs:
 Typical usage::
 
     from examples.vit5_imagenet.v5_patchmerge._base_config import (
-        build_hierarchical_net, get_base_config
+        get_hierarchical_net_config, get_base_config
     )
     config = get_base_config()
-    config.net = build_hierarchical_net()
+    config.net = get_hierarchical_net_config()
 """
 
 import torch
 
-from nvsubquadratic.lazy_config import LazyConfig
+from nvsubquadratic.lazy_config import LazyConfig, instantiate
 from nvsubquadratic.modules.ckconv_nd import CKConvND
 from nvsubquadratic.modules.grn import GlobalResponseNorm
 from nvsubquadratic.modules.hyena_nd import Hyena
@@ -79,7 +79,7 @@ def get_base_config(*args, **kwargs):
     return _get(*args, **kwargs)
 
 
-__all__ = ["build_hierarchical_net", "get_base_config"]
+__all__ = ["build_hierarchical_net", "get_base_config", "get_hierarchical_net_config"]
 
 
 # ── Architecture constants ──────────────────────────────────────────────────
@@ -209,15 +209,15 @@ def _make_hyena_block_cfg(
 # ── Network builder ──────────────────────────────────────────────────────────
 
 
-def build_hierarchical_net(
+def get_hierarchical_net_config(
     base_dim: int = BASE_DIM,
     stage_depths: list[int] | None = None,
     max_drop_path_rate: float = DROP_PATH_RATE,
     drop_path_schedule: str = "linear",
     num_classes: int = NUM_CLASSES,
     fft_backend: str = "subq_ops",
-) -> ViT5HierarchicalNet:
-    """Build a ViT5HierarchicalNet with pure-Hyena blocks and Swin-style Patch Merging.
+) -> LazyConfig:
+    """Configure a ViT5HierarchicalNet with pure-Hyena blocks and Swin-style Patch Merging.
 
     Args:
         base_dim: Channel width of stage 1 (C₁). Doubles at each merge.
@@ -230,7 +230,7 @@ def build_hierarchical_net(
         fft_backend: CKConvND backend; use torch_fft for CPU execution.
 
     Returns:
-        Instantiated ``ViT5HierarchicalNet``.
+        Lazy network configuration; no parameters are allocated or initialized.
     """
     if stage_depths is None:
         stage_depths = STAGE_DEPTHS
@@ -255,10 +255,35 @@ def build_hierarchical_net(
             )
         )
 
-    return ViT5HierarchicalNet(
+    return LazyConfig(ViT5HierarchicalNet)(
         in_channels=INPUT_CHANNELS,
         num_classes=num_classes,
         stage_specs=stage_specs,
         max_drop_path_rate=max_drop_path_rate,
         drop_path_schedule=drop_path_schedule,
+    )
+
+
+def build_hierarchical_net(
+    base_dim: int = BASE_DIM,
+    stage_depths: list[int] | None = None,
+    max_drop_path_rate: float = DROP_PATH_RATE,
+    drop_path_schedule: str = "linear",
+    num_classes: int = NUM_CLASSES,
+    fft_backend: str = "subq_ops",
+) -> ViT5HierarchicalNet:
+    """Instantiate a hierarchy for direct use; recipes use get_hierarchical_net_config.
+
+    Arguments match :func:`get_hierarchical_net_config`. Callers of this eager
+    convenience API must set their seed before calling it.
+    """
+    return instantiate(
+        get_hierarchical_net_config(
+            base_dim=base_dim,
+            stage_depths=stage_depths,
+            max_drop_path_rate=max_drop_path_rate,
+            drop_path_schedule=drop_path_schedule,
+            num_classes=num_classes,
+            fft_backend=fft_backend,
+        )
     )
